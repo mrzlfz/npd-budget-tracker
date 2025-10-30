@@ -1,0 +1,47 @@
+{
+  "name": "npd-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "type-check": "pnpm type-check:web && pnpm type-check:convex",
+    "type-check:web": "cd apps/web && pnpm type-check",
+    "type-check:convex": "cd packages/convex && pnpm type-check",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "clean": "turbo run clean",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.1.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.2",
+    "prettier": "^3.2.5",
+    "turbo": "^2.5.8",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@8.15.1",
+  "dependencies": {
+    "@mantine/charts": "^8.3.6",
+    "@mantine/core": "^8.3.6",
+    "@mantine/dates": "^8.3.6",
+    "@mantine/hooks": "^8.3.6",
+    "@mantine/modals": "^8.3.6",
+    "@mantine/notifications": "^8.3.6",
+    "@mantine/spotlight": "^8.3.6"
+  }
+}

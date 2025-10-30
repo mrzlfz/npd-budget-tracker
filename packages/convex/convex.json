@@ -1,0 +1,5 @@
+{
+  "prodUrl": "https://example.convex.cloud",
+  "functions": "./functions",
+  "schema": "./schema.ts"
+}
