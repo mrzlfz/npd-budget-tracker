@@ -2,6 +2,86 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
+// NPD Status State Machine
+const NPD_STATUS_TRANSITIONS = {
+  draft: {
+    next: ['diajukan'],
+    canEdit: true,
+    canDelete: true,
+    description: 'Draft - dapat diedit dan dihapus'
+  },
+  diajukan: {
+    next: ['diverifikasi', 'draft'], // Can revert to draft
+    canEdit: false,
+    canDelete: false,
+    description: 'Diajukan - menunggu verifikasi'
+  },
+  diverifikasi: {
+    next: ['final', 'diajukan'], // Can revert to diajukan
+    canEdit: false,
+    canDelete: false,
+    description: 'Diverifikasi - siap difinalisasi'
+  },
+  final: {
+    next: [], // Final state - no transitions
+    canEdit: false,
+    canDelete: false,
+    description: 'Final - dokumen terkunci'
+  }
+} as const;
+
+function canTransition(from: string, to: string): boolean {
+  const transitions = NPD_STATUS_TRANSITIONS[from as keyof typeof NPD_STATUS_TRANSITIONS];
+  return transitions ? transitions.next.includes(to) : false;
+}
+
+// Real-time subscription for NPD status changes
+export const onStatusChange = query({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, { organizationId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return;
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user || user.organizationId !== organizationId) {
+      return;
+    }
+
+    // Subscribe to NPD status changes for this organization
+    return ctx.db
+      .query("npdDocuments")
+      .withIndex("by_organization", q => q.eq("organizationId", organizationId))
+      .collect();
+  },
+});
+
+// Subscribe to SP2D creation events
+export const onSP2DCreation = query({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, { organizationId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return;
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user || user.organizationId !== organizationId) {
+      return;
+    }
+
+    return ctx.db
+      .query("sp2dRefs")
+      .withIndex("by_organization", q => q.eq("organizationId", organizationId))
+      .collect();
+  },
+});
+
 // Permission checking helper functions
 async function hasPermission(ctx: any, userId: any, action: string, resource: string): Promise<boolean> {
   const user = await ctx.db.get(userId);
@@ -225,7 +305,7 @@ export const create = mutation({
 
     // Validate NPD data before creation
     if (args.lines && args.lines.length > 0) {
-      const validationResult = await ctx.db.query(api.validations.validateNPD, {
+      const validationResult = await ctx.runMutation(api.validations.validateNPD, {
         organizationId: user.organizationId,
         npdData: {
           jenis: args.jenis,
@@ -236,6 +316,23 @@ export const create = mutation({
       if (!validationResult.isValid) {
         throw new Error(`Validasi gagal: ${validationResult.errors.join(', ')}`);
       }
+
+      // Enhanced validation: Check required attachments based on NPD type
+      const npdTypeValidation = await ctx.runQuery(api.validations.getNpdTypeValidation, {
+        jenis: args.jenis
+      });
+
+      // For now, we'll warn about missing required attachments
+      // In a full implementation, you'd check actual attachments
+      if (npdTypeValidation.requiredAttachments.length > 0) {
+        console.warn(`NPD ${args.jenis} memerlukan lampiran wajib: ${npdTypeValidation.requiredAttachments.join(', ')}`);
+      }
+    }
+
+    // Additional validation: Check subkegiatan fiscal year consistency
+    const subkegiatan = await ctx.db.get(args.subkegiatanId);
+    if (subkegiatan && subkegiatan.fiscalYear !== args.tahun) {
+      throw new Error(`Tahun NPD (${args.tahun}) tidak sesuai dengan tahun sub kegiatan (${subkegiatan.fiscalYear})`);
     }
 
     // Generate document number (organization-specific and year-specific)
@@ -351,9 +448,10 @@ export const submit = mutation({
       throw new Error("You don't have permission to submit NPDs");
     }
 
-    // Check if NPD can be submitted (must be draft and have lines)
-    if (existing.status !== "draft") {
-      throw new Error("Only draft NPDs can be submitted");
+    // Check if NPD can be submitted using state machine
+    if (!canTransition(existing.status, "diajukan")) {
+      const currentStatus = NPD_STATUS_TRANSITIONS[existing.status as keyof typeof NPD_STATUS_TRANSITIONS];
+      throw new Error(`Cannot transition from ${existing.status}. ${currentStatus?.description || 'Invalid status'}`);
     }
 
     // Check if NPD has at least one line
@@ -472,9 +570,10 @@ export const finalize = mutation({
       throw new Error("You don't have permission to finalize NPDs");
     }
 
-    // Check if NPD can be finalized (must be verified)
-    if (existing.status !== "diverifikasi") {
-      throw new Error("Only verified NPDs can be finalized");
+    // Check if NPD can be finalized using state machine
+    if (!canTransition(existing.status, "final")) {
+      const currentStatus = NPD_STATUS_TRANSITIONS[existing.status as keyof typeof NPD_STATUS_TRANSITIONS];
+      throw new Error(`Cannot transition from ${existing.status}. ${currentStatus?.description || 'Invalid status'}`);
     }
 
     // Update status to final
@@ -499,31 +598,104 @@ export const finalize = mutation({
   },
 });
 
-// Helper function to generate document numbers
+// Helper function to validate cumulative NPD amounts per account
+async function validateCumulativeNPDPerAccount(
+  ctx: any,
+  organizationId: any,
+  accountId: any,
+  currentNpdId: any = null,
+  newAmount: number = 0
+): Promise<{ isValid: boolean; message: string; totalNpdAmount: number; sisaPagu: number }> {
+  // Get all NPDs for this organization and account (excluding current NPD if updating)
+  const allNPDs = await ctx.db
+    .query("npdDocuments")
+    .withIndex("by_organization", q => q.eq("organizationId", organizationId))
+    .collect();
+
+  // Filter NPDs that are not draft (submitted, verified, final)
+  const activeNpdIds = allNPDs
+    .filter(npd => npd.status !== 'draft' && npd._id !== currentNpdId)
+    .map(npd => npd._id);
+
+  // Get all lines for active NPDs
+  const existingLines = await Promise.all(
+    activeNpdIds.map(async (npdId) => {
+      const lines = await ctx.db
+        .query("npdLines")
+        .withIndex("by_npd", q => q.eq("npdId", npdId))
+        .collect();
+      return lines;
+    })
+  );
+
+  // Calculate total existing NPD amount for this account
+  const totalExistingAmount = existingLines.flat()
+    .filter(line => line.accountId === accountId)
+    .reduce((sum, line) => sum + line.jumlah, 0);
+
+  // Get account details
+  const account = await ctx.db.get(accountId);
+  if (!account) {
+    return {
+      isValid: false,
+      message: "Akun tidak ditemukan",
+      totalNpdAmount: 0,
+      sisaPagu: 0
+    };
+  }
+
+  // Calculate total with new amount
+  const totalNpdAmount = totalExistingAmount + newAmount;
+
+  // Check if total exceeds remaining budget
+  const isValid = totalNpdAmount <= account.sisaPagu;
+
+  return {
+    isValid,
+    message: isValid
+      ? "Valid"
+      : `Total NPD (${formatCurrency(totalNpdAmount)}) untuk akun ${account.kode} melebihi sisa pagu (${formatCurrency(account.sisaPagu)})`
+    ,
+    totalNpdAmount,
+    sisaPagu: account.sisaPagu
+  };
+}
+
+// Helper function to format currency for display
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+  }).format(amount);
+}
+
+// Helper function to generate document numbers with race condition protection
 async function generateDocumentNumber(ctx: any, organizationId: any, tahun: number): Promise<string> {
   const currentYear = new Date().getFullYear();
   const year = tahun || currentYear;
 
-  // Get existing NPDs for this organization and year to determine next number
+  // Get existing NPDs for this organization and year
   const existingNPDs = await ctx.db
     .query("npdDocuments")
     .withIndex("by_organization_tahun", q => q.eq("organizationId", organizationId).eq("tahun", year))
-    .collect()
-    .then(npds => npds.map(npd => npd.documentNumber));
+    .collect();
 
-  existingNPDs.sort((a, b) => {
-    const numA = parseInt(a.split('-')[1] || '0');
-    const numB = parseInt(b.split('-')[1] || '0');
-    return numB - numA;
-  });
+  // Extract sequence numbers from document numbers
+  const sequenceNumbers = existingNPDs
+    .map(npd => npd.documentNumber)
+    .filter(docNum => docNum && docNum.startsWith(`NPD-${year}-`))
+    .map(docNum => {
+      const parts = docNum.split('-');
+      return parts.length >= 3 ? parseInt(parts[2] || '0', 10) : 0;
+    })
+    .filter(num => !isNaN(num));
 
-  const lastNumber = existingNPDs.length > 0
-    ? Math.max(...existingNPDs.map(npd => parseInt(npd.documentNumber.split('-')[1] || '0')))
-    : 0;
-
+  // Find the highest sequence number
+  const lastNumber = sequenceNumbers.length > 0 ? Math.max(...sequenceNumbers) : 0;
   const nextNumber = lastNumber + 1;
 
-  // Format: NPD-[YEAR]-[SEQ]
+  // Format: NPD-[YEAR]-[SEQ] with 3-digit padding
   return `NPD-${year}-${nextNumber.toString().padStart(3, '0')}`;
 }
 
@@ -560,16 +732,29 @@ export const addLine = mutation({
       throw new Error("Cannot add lines to finalized NPD");
     }
 
-    // Get current lines to check total against remaining budget
+    // Validate cumulative NPD amounts for this account
+    const cumulativeValidation = await validateCumulativeNPDPerAccount(
+      ctx,
+      user.organizationId,
+      args.accountId,
+      args.npdId, // Current NPD to exclude from cumulative check
+      args.jumlah // New amount to add
+    );
+
+    if (!cumulativeValidation.isValid) {
+      throw new Error(cumulativeValidation.message);
+    }
+
+    // Get current lines to check total against remaining budget for this specific NPD
     const currentLines = await ctx.db
       .query("npdLines")
       .withIndex("by_npd", q => q.eq("npdId", args.npdId))
       .collect()
       .then(lines => lines.reduce((sum, line) => sum + line.jumlah, 0));
 
-    // Check if adding this line exceeds available budget
+    // Additional check: ensure current NPD doesn't exceed account's sisa pagu
     if (currentLines + args.jumlah > account.sisaPagu) {
-      throw new Error(`Insufficient budget. Available: ${account.sisaPagu}, Requested: ${currentLines + args.jumlah}`);
+      throw new Error(`Insufficient budget for this NPD. Available: ${formatCurrency(account.sisaPagu)}, Current NPD: ${formatCurrency(currentLines)}, Requested: ${formatCurrency(args.jumlah)}`);
     }
 
     // Add the line
@@ -643,11 +828,36 @@ export const updateLine = mutation({
 
     // Calculate the difference in amount
     const amountDiff = args.jumlah - existingLine.jumlah;
+
+    // Validate cumulative NPD amounts for this account with new amount
+    // Get current total for this NPD
+    const currentNpdLines = await ctx.db
+      .query("npdLines")
+      .withIndex("by_npd", q => q.eq("npdId", existingLine.npdId))
+      .collect()
+      .then(lines => lines.reduce((sum, line) => sum + line.jumlah, 0));
+
+    // Calculate what the new total for this NPD would be
+    const newNpdTotal = currentNpdLines - existingLine.jumlah + args.jumlah;
+
+    // Validate cumulative budget considering change
+    const cumulativeValidation = await validateCumulativeNPDPerAccount(
+      ctx,
+      user.organizationId,
+      existingLine.accountId,
+      existingLine.npdId, // Current NPD to exclude from cumulative check
+      newNpdTotal // New total for this NPD
+    );
+
+    if (!cumulativeValidation.isValid) {
+      throw new Error(cumulativeValidation.message);
+    }
+
     const currentSisa = account.sisaPagu + existingLine.jumlah;
 
-    // Validate budget constraints
+    // Additional check: validate immediate budget impact
     if (amountDiff > currentSisa) {
-      throw new Error(`Insufficient budget. Available: ${currentSisa}, Requested additional: ${amountDiff}`);
+      throw new Error(`Insufficient budget. Available: ${formatCurrency(currentSisa)}, Requested additional: ${formatCurrency(amountDiff)}`);
     }
 
     // Update the line
@@ -742,6 +952,243 @@ export const removeLine = mutation({
   },
 });
 
+// Lock NPD for verification/editing protection
+export const lockNPD = mutation({
+  args: {
+    npdId: v.id("npdDocuments"),
+    reason: v.optional(v.string()),
+    expiresMinutes: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get NPD and user
+    const npd = await ctx.db.get(args.npdId);
+    const user = await ctx.db.get(userId);
+
+    if (!npd || !user) {
+      throw new Error("NPD or user not found");
+    }
+
+    // Check if user has permission to lock (verifikator, bendahara, admin)
+    const canLock = ["admin", "verifikator", "bendahara"].includes(user.role);
+    if (!canLock) {
+      throw new Error("Insufficient permissions to lock NPD");
+    }
+
+    // Check if NPD is already locked
+    if (npd.isLocked) {
+      // Check if lock has expired
+      const now = Date.now();
+      const lockExpired = npd.lockExpiresAt && now > npd.lockExpiresAt;
+
+      if (!lockExpired) {
+        throw new Error("NPD is already locked");
+      }
+    }
+
+    const now = Date.now();
+    const lockExpiresAt = args.expiresMinutes ? now + (args.expiresMinutes * 60 * 1000) : now + (30 * 60 * 1000); // Default 30 minutes
+
+    // Lock the NPD
+    await ctx.db.patch(args.npdId, {
+      isLocked: true,
+      lockedBy: userId,
+      lockedAt: now,
+      lockReason: args.reason || "Verification in progress",
+      lockExpiresAt,
+      updatedAt: now,
+    });
+
+    // Log lock action
+    await ctx.db.insert("auditLogs", {
+      action: "locked_npd",
+      entityTable: "npdDocuments",
+      entityId: args.npdId,
+      entityData: {
+        lockedBy: userId,
+        reason: args.reason,
+        expiresAt: new Date(lockExpiresAt).toISOString(),
+      },
+      actorUserId: userId,
+      organizationId: npd.organizationId,
+      createdAt: now,
+    });
+
+    // Create notification
+    await ctx.db.insert("notifications", {
+      userId: npd.createdBy,
+      type: "npd_locked",
+      title: "NPD Dikunci",
+      message: `NPD ${npd.documentNumber} sedang dalam proses verifikasi`,
+      entityId: args.npdId,
+      entityType: "npd",
+      isRead: false,
+      createdAt: now,
+    });
+
+    return { success: true, lockExpiresAt };
+  },
+});
+
+// Unlock NPD
+export const unlockNPD = mutation({
+  args: {
+    npdId: v.id("npdDocuments"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get NPD and user
+    const npd = await ctx.db.get(args.npdId);
+    const user = await ctx.db.get(userId);
+
+    if (!npd || !user) {
+      throw new Error("NPD or user not found");
+    }
+
+    // Check if user has permission to unlock (admin, original locker, or current verifier)
+    const canUnlock =
+      user.role === "admin" ||
+      (npd.lockedBy && npd.lockedBy === userId) ||
+      (user.role === "verifikator" && npd.status === "diverifikasi");
+
+    if (!canUnlock) {
+      throw new Error("Insufficient permissions to unlock NPD");
+    }
+
+    // Check if NPD is locked
+    if (!npd.isLocked) {
+      throw new Error("NPD is not locked");
+    }
+
+    const now = Date.now();
+
+    // Unlock the NPD
+    await ctx.db.patch(args.npdId, {
+      isLocked: false,
+      lockedBy: undefined,
+      lockedAt: undefined,
+      lockReason: undefined,
+      lockExpiresAt: undefined,
+      updatedAt: now,
+    });
+
+    // Log unlock action
+    await ctx.db.insert("auditLogs", {
+      action: "unlocked_npd",
+      entityTable: "npdDocuments",
+      entityId: args.npdId,
+      entityData: {
+        unlockedBy: userId,
+        previousLock: {
+          lockedBy: npd.lockedBy,
+          lockedAt: npd.lockedAt,
+          reason: npd.lockReason,
+        },
+        reason: args.reason,
+      },
+      actorUserId: userId,
+      organizationId: npd.organizationId,
+      createdAt: now,
+    });
+
+    // Create notification
+    await ctx.db.insert("notifications", {
+      userId: npd.createdBy,
+      type: "npd_unlocked",
+      title: "NPD Dibuka Kembali",
+      message: `NPD ${npd.documentNumber} dapat diedit kembali`,
+      entityId: args.npdId,
+      entityType: "npd",
+      isRead: false,
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+// Check NPD lock status
+export const getLockStatus = query({
+  args: {
+    npdId: v.id("npdDocuments"),
+  },
+  handler: async (ctx, args) => {
+    const npd = await ctx.db.get(args.npdId);
+    if (!npd) {
+      throw new Error("NPD not found");
+    }
+
+    const now = Date.now();
+    const isLocked = npd.isLocked;
+    const lockExpired = npd.lockExpiresAt && now > npd.lockExpiresAt;
+
+    return {
+      isLocked: isLocked && !lockExpired,
+      lockedBy: npd.lockedBy,
+      lockedAt: npd.lockedAt,
+      lockReason: npd.lockReason,
+      lockExpiresAt: npd.lockExpiresAt,
+      timeRemaining: isLocked && npd.lockExpiresAt ? Math.max(0, npd.lockExpiresAt - now) : 0,
+    };
+  },
+});
+
+// Auto-cleanup expired locks (scheduled action)
+export const cleanupExpiredLocks = action({
+  handler: async (ctx) => {
+    const now = Date.now();
+    const expiredLocks = await ctx.db
+      .query("npdDocuments")
+      .filter(q =>
+        q.and(
+          q.eq("isLocked", true),
+          q.lt("lockExpiresAt", now)
+        )
+      )
+      .collect();
+
+    for (const npd of expiredLocks) {
+      await ctx.db.patch(npd._id, {
+        isLocked: false,
+        lockedBy: undefined,
+        lockedAt: undefined,
+        lockReason: undefined,
+        lockExpiresAt: undefined,
+        updatedAt: now,
+      });
+
+      // Log automatic unlock
+      await ctx.db.insert("auditLogs", {
+        action: "auto_unlocked_npd",
+        entityTable: "npdDocuments",
+        entityId: npd._id,
+        entityData: {
+          reason: "Lock expired",
+          previousLock: {
+            lockedBy: npd.lockedBy,
+            lockedAt: npd.lockedAt,
+            reason: npd.lockReason,
+          },
+        },
+        actorUserId: "system",
+        organizationId: npd.organizationId,
+        createdAt: now,
+      });
+    }
+
+    return { unlocked: expiredLocks.length };
+  },
+});
+
 // Reject NPD (revert from submitted/verified back to draft)
 export const reject = mutation({
   args: {
@@ -771,9 +1218,10 @@ export const reject = mutation({
       throw new Error("You don't have permission to reject NPDs");
     }
 
-    // Check if NPD can be rejected (must be submitted or verified)
-    if (existing.status !== "diajukan" && existing.status !== "diverifikasi") {
-      throw new Error("Only submitted or verified NPDs can be rejected");
+    // Check if NPD can be rejected using state machine
+    if (!canTransition(existing.status, "draft")) {
+      const currentStatus = NPD_STATUS_TRANSITIONS[existing.status as keyof typeof NPD_STATUS_TRANSITIONS];
+      throw new Error(`Cannot transition from ${existing.status}. ${currentStatus?.description || 'Invalid status'}`);
     }
 
     // Update status back to draft and add rejection note

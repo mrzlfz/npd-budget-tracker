@@ -35,6 +35,7 @@ import { api } from '../../../../convex/_generated/api';
 import { env } from '@/env';
 import { formatCurrency } from '@/lib/utils/format';
 import { useFileUpload } from '@/hooks/useFileUpload';
+import { FileAttachmentViewer } from '@/components/npd/FileAttachmentViewer';
 
 // Zod schema for NPD creation
 const npdSchema = z.object({
@@ -473,14 +474,16 @@ export default function NPDBuilder() {
               />
 
               {/* File Upload Component */}
-              <FileUpload
-                value={uploadedFiles}
-                onChange={setUploadedFiles}
-                disabled={!createdNpdId || isSubmitting}
-                maxFiles={5}
-                maxSize={10 * 1024 * 1024} // 10MB
-                className="mt-4"
+            {createdNpdId && (
+              <FileAttachmentViewer
+                npdId={createdNpdId}
+                npdStatus="draft"
+                readonly={isSubmitting}
+                onFileDeleted={() => {
+                  console.log('File deleted, refresh files list');
+                }}
               />
+            )}
 
               <Group mt="md">
                 <Button

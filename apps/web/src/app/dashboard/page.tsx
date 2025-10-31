@@ -42,6 +42,8 @@ import {
 } from '@tabler/icons-react'
 import { useAppSelector, useAppDispatch } from '@/lib/store'
 import { setRkaFiscalYear } from '@/lib/uiSlice'
+import { BudgetUtilizationChart } from '@/components/charts/BudgetUtilizationChart'
+import { MultiIndicatorTrendChart } from '@/components/charts/MultiIndicatorTrendChart'
 import { formatCurrency, formatNumber } from '@/lib/utils/format'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useDashboardData } from '@/hooks/useDashboardData'
@@ -127,6 +129,16 @@ export default function Dashboard() {
     statusData
   } = useDashboardData()
 
+  // Calculate KPIs from real data
+  const kpis = {
+    completedNPDs: summary?.byStatus?.final || 0,
+    pendingNPDs: summary?.byStatus?.diajukan || 0,
+    totalSP2D: summary?.total || 0,
+    finalizedSP2D: summary?.byStatus?.final || 0,
+    avgPerformanceRate: summary?.avgPerformanceRate || 0,
+    highPerformingIndicators: summary?.highPerformingIndicators || 0
+  }
+
   // Generate fiscal years
   const generateFiscalYears = () => {
     const currentYear = new Date().getFullYear()
@@ -141,12 +153,11 @@ export default function Dashboard() {
   const handleFiscalYearChange = (value: number | null) => {
     if (value) {
       dispatch(setRkaFiscalYear(value))
-      loadDashboardData()
     }
   }
 
   useEffect(() => {
-    loadDashboardData()
+    // Initial load is handled by useDashboardData hook
   }, [])
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -264,6 +275,30 @@ export default function Dashboard() {
           color="indigo"
           loading={loading}
         />
+      </SimpleGrid>
+
+      {/* Budget Utilization Charts */}
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mb="lg">
+        <Card p="lg" withBorder>
+          <Title order={4} mb="md">Analisis Budget & Utilisasi</Title>
+          <BudgetUtilizationChart
+            data={accounts || []}
+            height={400}
+            title="Budget Utilisasi per Akun"
+            showExport={true}
+          />
+        </Card>
+
+        <Card p="lg" withBorder>
+          <Title order={4} mb="md">Tren Performansi Multi-Indikator</Title>
+          <MultiIndicatorTrendChart
+            indicators={statusData?.indicators || []}
+            height={450}
+            title="Tren Performansi"
+            showExport={true}
+            onRefresh={() => window.location.reload()}
+          />
+        </Card>
       </SimpleGrid>
 
       {/* NPD Status */}

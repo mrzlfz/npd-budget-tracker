@@ -20,7 +20,10 @@ import {
   IconDownload,
   IconRefresh,
 } from '@tabler/icons-react'
-import { RKATree, type RKAProgramNode } from '@/components/rka/RKATree'
+import { RKATree, type RKAProgramNode, type RKANode } from '@/components/rka/RKATree'
+import { RKABreadcrumbs } from '@/components/rka/RKABreadcrumbs'
+import { RKASearch } from '@/components/rka/RKASearch'
+import { RKADetailPanel } from '@/components/rka/RKADetailPanel'
 import { useAppSelector, useAppDispatch } from '@/lib/store'
 import { setRkaFiscalYear, setRkaSearchQuery, setRkaStatus } from '@/lib/uiSlice'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -35,6 +38,9 @@ export default function RKAExplorer() {
   const [programs, setPrograms] = useState<RKAProgramNode[]>([])
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [currentPath, setCurrentPath] = useState<RKANode[]>([])
+  const [selectedNode, setSelectedNode] = useState<RKANode | null>(null)
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
 
   // Generate fiscal years (current year + 5 years back)
   const generateFiscalYears = () => {
@@ -105,6 +111,49 @@ export default function RKAExplorer() {
     }
   }
 
+  // Handle node click
+  const handleNodeClick = (node: RKANode) => {
+    setSelectedNode(node)
+    // Update breadcrumb path
+    if (node.type === 'program') {
+      setCurrentPath([node])
+    } else {
+      // For other nodes, we would need to build the full path
+      // This is simplified - in production, we'd track the full path
+      setCurrentPath(prev => [...prev, node])
+    }
+  }
+
+  // Handle breadcrumb navigation
+  const handleBreadcrumbNavigate = (node: RKANode) => {
+    setSelectedNode(node)
+    // Reset path to clicked node level
+    const nodeIndex = currentPath.findIndex(n => n._id === node._id)
+    if (nodeIndex !== -1) {
+      setCurrentPath(currentPath.slice(0, nodeIndex + 1))
+    }
+  }
+
+  // Handle lazy loading children
+  const handleLoadChildren = async (node: RKANode) => {
+    // This would load children on demand
+    // For now, children are already loaded from the hierarchy
+    console.log('Loading children for:', node._id)
+  }
+
+  // Handle expand/collapse
+  const handleToggleExpand = (nodeId: string) => {
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId)
+      } else {
+        newSet.add(nodeId)
+      }
+      return newSet
+    })
+  }
+
   // Handle edit
   const handleEdit = (node: any) => {
     console.log('Edit node:', node)
@@ -143,134 +192,172 @@ export default function RKAExplorer() {
     <Container size="xl" py="md">
       <LoadingOverlay visible={loading} />
 
-      {/* Header */}
-      <Group justify="space-between" mb="lg">
-        <div>
-          <Title order={2}>RKA Explorer</Title>
-          <Text color="dimmed" size="sm">
-            Rencana Kerja dan Anggaran Hierarchy
-          </Text>
-        </div>
+      {/* Breadcrumb Navigation */}
+      {currentPath.length > 0 && (
+        <RKABreadcrumbs
+          currentPath={currentPath}
+          onNavigate={handleBreadcrumbNavigate}
+        />
+      )}
 
-        <Group>
-          {canCreateRKA && (
-            <Button
-              leftSection={<IconPlus size={16} />}
-              onClick={() => {
-                // Open create RKA modal
-                console.log('Create new RKA')
-              }}
-            >
-              Buat RKA
-            </Button>
-          )}
+      <Grid cols={{ base: 1, lg: selectedNode ? 2 : 1 }} spacing="lg">
+        {/* Main Content - RKA Tree */}
+        <div span={{ base: 1, lg: selectedNode ? 1 : 'auto' }}>
+          {/* Header */}
+          <Group justify="space-between" mb="lg">
+            <div>
+              <Title order={2}>RKA Explorer</Title>
+              <Text color="dimmed" size="sm">
+                Rencana Kerja dan Anggaran Hierarchy
+              </Text>
+            </div>
 
-          <Button
-            variant="light"
-            leftSection={<IconRefresh size={16} />}
-            onClick={handleRefresh}
-            loading={refreshing}
-          >
-            Refresh
-          </Button>
+            <Group>
+              {canCreateRKA && (
+                <Button
+                  leftSection={<IconPlus size={16} />}
+                  onClick={() => {
+                    // Open create RKA modal
+                    console.log('Create new RKA')
+                  }}
+                >
+                  Buat RKA
+                </Button>
+              )}
 
-          <Button
-            variant="light"
-            leftSection={<IconDownload size={16} />}
-            onClick={() => {
-              // Export functionality
-              console.log('Export RKA data')
-            }}
-          >
-            Export
-          </Button>
-        </Group>
-      </Group>
+              <Button
+                variant="light"
+                leftSection={<IconRefresh size={16} />}
+                onClick={handleRefresh}
+                loading={refreshing}
+              >
+                Refresh
+              </Button>
 
-      {/* Filters */}
-      <Card mb="lg" p="md" withBorder>
-        <Group justify="space-between">
-          <Group>
-            <Select
-              placeholder="Pilih Tahun Anggaran"
-              data={generateFiscalYears()}
-              value={fiscalYear}
-              onChange={handleFiscalYearChange}
-              w={200}
-              searchable={false}
-              clearable={false}
-            />
-
-            <Select
-              placeholder="Status"
-              data={[
-                { value: 'active', label: 'Aktif' },
-                { value: 'inactive', label: 'Tidak Aktif' },
-              ]}
-              value={status}
-              onChange={(value) => dispatch(setRkaStatus(value))}
-              w={150}
-              clearable
-            />
+              <Button
+                variant="light"
+                leftSection={<IconDownload size={16} />}
+                onClick={() => {
+                  // Export functionality
+                  console.log('Export RKA data')
+                }}
+              >
+                Export
+              </Button>
+            </Group>
           </Group>
 
-          <Group>
-            {/* Search functionality would go here */}
+          {/* Search and Filters */}
+          <RKASearch
+            onSearch={handleSearch}
+            onFilter={(filters) => {
+              // Handle filter changes
+              console.log('Filters changed:', filters)
+            }}
+            loading={loading}
+            value={searchQuery}
+          />
+
+          {/* Quick Info */}
+          <Group mb="lg" justify="space-between">
             <Text color="dimmed" size="sm">
               {programs.length} program ditemukan
             </Text>
+
+            <Group>
+              <Select
+                placeholder="Pilih Tahun Anggaran"
+                data={generateFiscalYears()}
+                value={fiscalYear}
+                onChange={handleFiscalYearChange}
+                w={200}
+                searchable={false}
+                clearable={false}
+              />
+
+              <Select
+                placeholder="Status"
+                data={[
+                  { value: 'active', label: 'Aktif' },
+                  { value: 'inactive', label: 'Tidak Aktif' },
+                ]}
+                value={status}
+                onChange={(value) => dispatch(setRkaStatus(value))}
+                w={150}
+                clearable
+              />
+            </Group>
           </Group>
-        </Group>
-      </Card>
 
-      {/* Summary Cards */}
-      <Group mb="lg" grow>
-        <Card p="md" withBorder style={{ flex: 1 }}>
-          <Text size="sm" color="dimmed">Total Pagu</Text>
-          <Text size="lg" weight={600}>
-            {formatCurrency(totals.totalPagu)}
-          </Text>
-        </Card>
+          {/* Summary Cards */}
+          <Group mb="lg" grow>
+            <Card p="md" withBorder style={{ flex: 1 }}>
+              <Text size="sm" color="dimmed">Total Pagu</Text>
+              <Text size="lg" weight={600}>
+                {formatCurrency(totals.totalPagu)}
+              </Text>
+            </Card>
 
-        <Card p="md" withBorder style={{ flex: 1 }}>
-          <Text size="sm" color="dimmed">Total Realisasi</Text>
-          <Text size="lg" weight={600}>
-            {formatCurrency(totals.totalRealisasi)}
-          </Text>
-        </Card>
+            <Card p="md" withBorder style={{ flex: 1 }}>
+              <Text size="sm" color="dimmed">Total Realisasi</Text>
+              <Text size="lg" weight={600}>
+                {formatCurrency(totals.totalRealisasi)}
+              </Text>
+            </Card>
 
-        <Card p="md" withBorder style={{ flex: 1 }}>
-          <Text size="sm" color="dimmed">Sisa Pagu</Text>
-          <Text size="lg" weight={600}>
-            {formatCurrency(totals.totalSisa)}
-          </Text>
-        </Card>
+            <Card p="md" withBorder style={{ flex: 1 }}>
+              <Text size="sm" color="dimmed">Sisa Pagu</Text>
+              <Text size="lg" weight={600}>
+                {formatCurrency(totals.totalSisa)}
+              </Text>
+            </Card>
 
-        <Card p="md" withBorder style={{ flex: 1 }}>
-          <Text size="sm" color="dimmed">Utilisasi</Text>
-          <Group>
-            <Text size="lg" weight={600}>
-              {totals.utilizationRate}%
-            </Text>
-            <Badge
-              color={totals.utilizationRate >= 100 ? 'red' : totals.utilizationRate >= 80 ? 'yellow' : 'green'}
-              variant="light"
-            >
-              {totals.utilizationRate >= 100 ? 'Over' : totals.utilizationRate >= 80 ? 'High' : 'Normal'}
-            </Badge>
+            <Card p="md" withBorder style={{ flex: 1 }}>
+              <Text size="sm" color="dimmed">Utilisasi</Text>
+              <Group>
+                <Text size="lg" weight={600}>
+                  {totals.utilizationRate}%
+                </Text>
+                <Badge
+                  color={totals.utilizationRate >= 100 ? 'red' : totals.utilizationRate >= 80 ? 'yellow' : 'green'}
+                  variant="light"
+                >
+                  {totals.utilizationRate >= 100 ? 'Over' : totals.utilizationRate >= 80 ? 'High' : 'Normal'}
+                </Badge>
+              </Group>
+            </Card>
           </Group>
-        </Card>
-      </Group>
 
-      {/* RKA Tree */}
-      <Card p="md" withBorder style={{ minHeight: '500px' }}>
-        <RKATree
-          data={programs}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          loading={loading}
-        />
-      </Card>
+          {/* RKA Tree */}
+          <Card p="md" withBorder style={{ minHeight: '500px' }}>
+            <RKATree
+              data={programs}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              loading={loading}
+              onLoadChildren={handleLoadChildren}
+              onNodeClick={handleNodeClick}
+              searchQuery={searchQuery}
+              expandedNodes={expandedNodes}
+            />
+          </Card>
+        </div>
+
+        {/* Detail Panel */}
+        {selectedNode && (
+          <div span={{ base: 1, lg: 1 }}>
+            <RKADetailPanel
+              node={selectedNode}
+              onClose={() => setSelectedNode(null)}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onCreateNPD={(node) => {
+                console.log('Create NPD for:', node)
+              }}
+            />
+          </div>
+        )}
+      </Grid>
     </Container>
   )
 }

@@ -38,6 +38,7 @@ import { api } from '../../../../convex/_generated/api'
 import { usePermissions } from '@/hooks/usePermissions'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format'
 import { notifications } from '@mantine/notifications'
+import { FileAttachmentViewer } from '@/components/npd/FileAttachmentViewer'
 
 interface NPDLine {
   _id: string
@@ -519,32 +520,15 @@ export default function NPDDetailPage() {
           </Card>
 
           {/* Attachments */}
-          {npd.attachments.length > 0 && (
-            <Card p="md" withBorder>
-              <Title order={4} mb="md">Lampiran</Title>
-              <Stack gap="sm">
-                {npd.attachments.map((attachment) => (
-                  <Group key={attachment._id} justify="space-between">
-                    <div>
-                      <Text size="sm" weight={500}>
-                        {attachment.namaFile}
-                      </Text>
-                      <Text size="xs" color="dimmed">
-                        {attachment.jenis} • {(attachment.ukuran / 1024 / 1024).toFixed(2)} MB
-                      </Text>
-                    </div>
-                    <ActionIcon
-                      variant="light"
-                      color="blue"
-                      onClick={() => window.open(attachment.url, '_blank')}
-                    >
-                      <IconDownload size={16} />
-                    </ActionIcon>
-                  </Group>
-                ))}
-              </Stack>
-            </Card>
-          )}
+          <FileAttachmentViewer
+            npdId={npd._id}
+            npdStatus={npd.status}
+            readonly={npd.status === 'final'}
+            onFileDeleted={() => {
+              // This will trigger a refresh of the component
+              console.log('File attachment deleted');
+            }}
+          />
         </Stack>
 
         {/* Right Column - Status Timeline */}

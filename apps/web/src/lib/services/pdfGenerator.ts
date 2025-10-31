@@ -1,4 +1,7 @@
 import { chromium, Browser, Page } from 'playwright'
+import { formatCurrency } from '@/lib/utils/format'
+import { api } from '@/convex/_generated/api'
+import type { Id } from 'convex/values'
 
 interface PDFGenerationOptions {
   format: 'A4' | 'Legal'
@@ -11,10 +14,53 @@ interface PDFGenerationOptions {
 interface PDFData {
   npd: any
   organization: any
+  templateConfig: any
   options: PDFGenerationOptions
 }
 
-export async function generatePDF({ npd, organization, options }: PDFData): Promise<Buffer> {
+export class PDFGenerator {
+  private browser: Browser | null = null
+
+  async generateNPDPDF({
+    npdId,
+    templateOptions = {}
+  }: {
+    npdId: Id<'npdDocuments'>
+    templateOptions?: Partial<PDFGenerationOptions>
+  }): Promise<{ url: string; size: number }> {
+    try {
+      // In production, this would call Convex action
+      console.log('Generating PDF for NPD:', npdId)
+
+      // For now, return mock data
+      const mockResult = {
+        url: `/api/pdf/preview/${npdId}`,
+        size: 1024 * 1024, // 1MB
+      }
+
+      return mockResult
+    } catch (error) {
+      console.error('PDF generation error:', error)
+      throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  private async initializeBrowser(): Promise<Browser> {
+    if (!this.browser) {
+      this.browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu'
+        ]
+      })
+    }
+    return this.browser
+  }
+
+  async generatePDFWithPlaywright({ npd, organization, templateConfig, options }: PDFData): Promise<Buffer> {
   let browser: Browser | null = null
 
   try {
@@ -81,7 +127,7 @@ export async function generatePDF({ npd, organization, options }: PDFData): Prom
   }
 }
 
-function generateHTMLContent({ npd, organization, options }: PDFData): string {
+  private generateHTMLContent({ npd, organization, templateConfig, options }: PDFData): string {
   const templateConfig = organization?.pdfTemplateConfig || {}
 
   return `
@@ -352,11 +398,3 @@ function generateHTMLContent({ npd, organization, options }: PDFData): string {
   `
 }
 
-// Helper function for currency formatting
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0
-  }).format(amount)
-}

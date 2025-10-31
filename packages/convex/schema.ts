@@ -154,6 +154,12 @@ export default defineSchema({
     tahun: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    // Document locking fields
+    isLocked: v.boolean(),
+    lockedBy: v.optional(v.id("users")),
+    lockedAt: v.optional(v.number()),
+    lockReason: v.optional(v.string()),
+    lockExpiresAt: v.optional(v.number()),
   })
     .index("by_organization", ["organizationId"])
     .index("by_subkegiatan", ["subkegiatanId"])
@@ -291,6 +297,28 @@ export default defineSchema({
     .index("by_indikator", ["indikatorNama"]),
 
   // Notifications - In-app and email notifications
+  verificationChecklists: defineTable({
+    npdId: v.id("npdDocuments"),
+    checklistType: v.string(), // "UP", "GU", "TU", "LS"
+    results: v.array(v.object({
+      itemId: v.string(),
+      checked: v.boolean(),
+      notes: v.optional(v.string()),
+      required: v.boolean(),
+    })),
+    status: v.string(), // "draft", "in_progress", "completed", "rejected"
+    verifiedBy: v.optional(v.id("users")),
+    verifiedAt: v.optional(v.number()),
+    overallNotes: v.optional(v.string()),
+    organizationId: v.id("organizations"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_npd", ["npdId"])
+    .index("by_organization", ["organizationId"])
+    .index("by_status", ["status"])
+    .index("by_type", ["checklistType"]),
+
   notifications: defineTable({
     userId: v.id("users"),
     type: v.string(), // "npd_submitted", "npd_verified", "npd_rejected", "sp2d_created", etc.
@@ -303,6 +331,27 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_entity", ["entityId", "entityType"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Import progress tracking
+  importProgress: defineTable({
+    organizationId: v.id("organizations"),
+    importType: v.string(), // "rka", "npd", "sp2d", etc.
+    totalRows: v.number(),
+    status: v.string(), // "started", "processing", "completed", "failed"
+    currentRow: v.number(),
+    errors: v.array(v.object({
+      row: v.number(),
+      field: v.string(),
+      message: v.string(),
+    })),
+    metadata: v.optional(v.any()), // Additional data like filename, user info
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_import_type", ["importType"])
+    .index("by_status", ["status"])
     .index("by_created_at", ["createdAt"]),
 });
 

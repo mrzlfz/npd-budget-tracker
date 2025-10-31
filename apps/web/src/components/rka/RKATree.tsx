@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Group,
   Text,
@@ -11,6 +11,11 @@ import {
   Stack,
   ActionIcon,
   Tooltip,
+  TextInput,
+  ScrollArea,
+  Skeleton,
+  Loader,
+  Button,
 } from '@mantine/core'
 import {
   IconChevronRight,
@@ -22,6 +27,9 @@ import {
   IconEdit,
   IconTrash,
   IconPlus,
+  IconSearch,
+  IconRefresh,
+  IconBreadCrumb,
 } from '@tabler/icons-react'
 import { formatCurrency } from '@/lib/utils/format'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -91,12 +99,30 @@ interface TreeNodeProps {
   onEdit?: (node: RKANode) => void
   onDelete?: (node: RKANode) => void
   onCreate?: (parentNode: RKANode, type: string) => void
+  onLoadChildren?: (node: RKANode) => Promise<void>
+  onNodeClick?: (node: RKANode) => void
+  searchQuery?: string
+  expandedNodes?: Set<string>
+  onToggleExpand?: (nodeId: string) => void
 }
 
-function TreeNode({ node, level, onEdit, onDelete, onCreate }: TreeNodeProps) {
-  const [opened, setOpened] = useState(false)
+function TreeNode({
+  node,
+  level,
+  onEdit,
+  onDelete,
+  onCreate,
+  onLoadChildren,
+  onNodeClick,
+  searchQuery,
+  expandedNodes,
+  onToggleExpand
+}: TreeNodeProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasLoadedChildren, setHasLoadedChildren] = useState(false)
   const { canUpdateRKA, canDeleteRKA } = usePermissions()
 
+  const isExpanded = expandedNodes?.has(node._id) || false
   const hasChildren = 'kegiatans' in node || 'subkegiatans' in node || 'accounts' in node
   const children = 'kegiatans' in node ? node.kegiatans :
                    'subkegiatans' in node ? node.subkegiatans :
@@ -144,10 +170,43 @@ function TreeNode({ node, level, onEdit, onDelete, onCreate }: TreeNodeProps) {
     }
   }
 
-  const handleToggle = () => {
-    if (hasChildren) {
-      setOpened(!opened)
+  const handleToggle = useCallback(async () => {
+    if (!hasChildren) {
+      onNodeClick?.(node)
+      return
     }
+
+    if (onLoadChildren && hasChildren && !hasLoadedChildren && !children.length) {
+      setIsLoading(true)
+      try {
+        await onLoadChildren(node)
+        setHasLoadedChildren(true)
+      } catch (error) {
+        console.error('Failed to load children:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    onToggleExpand?.(node._id)
+    onNodeClick?.(node)
+  }, [hasChildren, hasLoadedChildren, children.length, node, onLoadChildren, onToggleExpand, onNodeClick])
+
+  const highlightText = (text: string) => {
+    if (!searchQuery || !text) return text
+
+    const regex = new RegExp(`(${searchQuery})`, 'gi')
+    const parts = text.split(regex)
+
+    return parts.map((part, index) =>
+      regex.test(part) ? (
+        <Text key={index} span c="yellow" bg="dark.2">
+          {part}
+        </Text>
+      ) : (
+        part
+      )
+    )
   }
 
   const renderBudgetInfo = (node: any) => {
@@ -225,7 +284,13 @@ function TreeNode({ node, level, onEdit, onDelete, onCreate }: TreeNodeProps) {
         <Group gap="sm" onClick={handleToggle} style={{ cursor: hasChildren ? 'pointer' : 'default' }}>
           {hasChildren && (
             <ThemeIcon size="sm" variant="transparent">
-              {opened ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+              {isLoading ? (
+                <Loader size={12} />
+              ) : isExpanded ? (
+                <IconChevronDown size={12} />
+              ) : (
+                <IconChevronRight size={12} />
+              )}
             </ThemeIcon>
           )}
           <ThemeIcon size="sm" variant="transparent">
@@ -233,11 +298,11 @@ function TreeNode({ node, level, onEdit, onDelete, onCreate }: TreeNodeProps) {
           </ThemeIcon>
           <div style={{ flex: 1 }}>
             <Text size="sm" weight={500}>
-              {formatNodeLabel(node)}
+              {searchQuery ? highlightText(formatNodeLabel(node)) : formatNodeLabel(node)}
             </Text>
             {'uraian' in node && node.uraian && (
               <Text size="xs" color="dimmed" mt={2}>
-                {node.uraian}
+                {searchQuery ? highlightText(node.uraian) : node.uraian}
               </Text>
             )}
           </div>
@@ -249,8 +314,8 @@ function TreeNode({ node, level, onEdit, onDelete, onCreate }: TreeNodeProps) {
         </Group>
       </Group>
 
-      {hasChildren && children && (
-        <Collapse in={opened}>
+      {hasChildren && (isExpanded || children.length > 0) && (
+        <Collapse in={isExpanded}>
           <Stack gap={0}>
             {children.map((child) => (
               <TreeNode
@@ -260,6 +325,11 @@ function TreeNode({ node, level, onEdit, onDelete, onCreate }: TreeNodeProps) {
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onCreate={onCreate}
+                onLoadChildren={onLoadChildren}
+                onNodeClick={onNodeClick}
+                searchQuery={searchQuery}
+                expandedNodes={expandedNodes}
+                onToggleExpand={onToggleExpand}
               />
             ))}
           </Stack>
@@ -275,9 +345,50 @@ interface RKATreeProps {
   onDelete?: (node: RKANode) => void
   onCreate?: (parentNode: RKANode, type: string) => void
   loading?: boolean
+  onLoadChildren?: (node: RKANode) => Promise<void>
+  onNodeClick?: (node: RKANode) => void
+  searchQuery?: string
 }
 
-export function RKATree({ data, onEdit, onDelete, onCreate, loading = false }: RKATreeProps) {
+export function RKATree({
+  data,
+  onEdit,
+  onDelete,
+  onCreate,
+  loading = false,
+  onLoadChildren,
+  onNodeClick,
+  searchQuery
+}: RKATreeProps) {
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+  const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
+
+  const handleToggleExpand = useCallback((nodeId: string) => {
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId)
+      } else {
+        newSet.add(nodeId)
+      }
+      return newSet
+    })
+  }, [])
+
+  const handleLoadChildren = useCallback(async (node: RKANode) => {
+    if (onLoadChildren) {
+      setLoadingNodes(prev => new Set(prev).add(node._id))
+      try {
+        await onLoadChildren(node)
+      } finally {
+        setLoadingNodes(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(node._id)
+          return newSet
+        })
+      }
+    }
+  }, [onLoadChildren])
   if (loading) {
     return (
       <Box p="lg">
@@ -299,18 +410,25 @@ export function RKATree({ data, onEdit, onDelete, onCreate, loading = false }: R
   }
 
   return (
-    <Stack gap={0}>
-      {data.map((program) => (
-        <TreeNode
-          key={program._id}
-          node={program}
-          level={0}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onCreate={onCreate}
-        />
-      ))}
-    </Stack>
+    <ScrollArea.Autosize mah={600}>
+      <Stack gap={0}>
+        {data.map((program) => (
+          <TreeNode
+            key={program._id}
+            node={program}
+            level={0}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onCreate={onCreate}
+            onLoadChildren={handleLoadChildren}
+            onNodeClick={onNodeClick}
+            searchQuery={searchQuery}
+            expandedNodes={expandedNodes}
+            onToggleExpand={handleToggleExpand}
+          />
+        ))}
+      </Stack>
+    </ScrollArea.Autosize>
   )
 }
 

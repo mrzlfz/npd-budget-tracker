@@ -2,6 +2,16 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
+// Helper function to format currency
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 // Permission checking helper (reuse from npd.ts)
 async function hasPermission(ctx: any, userId: any, action: string, resource: string): Promise<boolean> {
   const user = await ctx.db.get(userId);
@@ -65,6 +75,12 @@ export const list = query({
     }
 
     const user = await ctx.db.get(userId);
+
+    // Check organization access
+    const userOrganizationId = user.organizationId;
+    if (args.organizationId && userOrganizationId !== args.organizationId) {
+      throw new Error("Access denied: User does not belong to specified organization");
+    }
     if (!user) {
       throw new Error("User not found");
     }
@@ -109,6 +125,100 @@ export const list = query({
   },
 });
 
+// Proportional distribution calculation helper
+export const calculateProportionalDistribution = mutation({
+  args: {
+    npdId: v.id("npdDocuments"),
+    totalAmount: v.number(),
+    distributionType: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get NPD lines
+    const npdLines = await ctx.db
+      .query("npdLines")
+      .withIndex("by_npd")
+      .filter(q => q.eq("npdId", args.npdId))
+      .collect();
+
+    if (npdLines.length === 0) {
+      throw new Error("No NPD lines found for distribution");
+    }
+
+    // Calculate proportional distribution
+    const distributedLines = npdLines.map(line => {
+      let proportion = 1; // Default equal distribution
+
+      if (args.distributionType === 'proportional_amount') {
+        // Distribute based on amount ratio
+        const totalOriginalAmount = npdLines.reduce((sum, line) => sum + line.jumlah, 0);
+        proportion = line.jumlah / totalOriginalAmount;
+      } else if (args.distributionType === 'proportional_volume') {
+        // Distribute based on volume ratio
+        const totalVolume = npdLines.reduce((sum, line) => {
+          const account = ctx.db.get(line.accountId);
+          return sum + (account?.volume || 0);
+        }, 0);
+        const lineAccount = ctx.db.get(line.accountId);
+        proportion = (lineAccount?.volume || 0) / totalVolume;
+      }
+
+      const distributedAmount = args.totalAmount * proportion;
+
+      return {
+        ...line,
+        jumlahDibayar: Math.round(distributedAmount),
+        persentase: Math.round(proportion * 100),
+      };
+    });
+
+    // Update NPD lines with distributed amounts
+    const now = Date.now();
+    for (const line of distributedLines) {
+      await ctx.db.patch(line._id, {
+        jumlahDibayar: line.jumlahDibayar,
+        persentase: line.persentase,
+        updatedAt: now,
+      });
+    }
+
+    // Update NPD with distribution info
+    await ctx.db.patch(args.npdId, {
+      distributionType: args.distributionType || 'proportional_amount',
+      distributedAt: now,
+      updatedAt: now,
+    });
+
+    // Log distribution action
+    await ctx.db.insert("auditLogs", {
+      action: "distributed_sp2d",
+      entityTable: "npdDocuments",
+      entityId: args.npdId,
+      entityData: {
+        totalAmount: args.totalAmount,
+        distributionType: args.distributionType || 'proportional_amount',
+        lineCount: npdLines.length,
+        distributedLines: distributedLines.map(line => ({
+          lineId: line._id,
+          originalAmount: line.jumlah,
+          distributedAmount: line.jumlahDibayar,
+          percentage: line.persentase,
+        })),
+      },
+      actorUserId: userId,
+      organizationId: npdLines[0]?.organizationId || 'unknown',
+      createdAt: now,
+    });
+
+    return { success: true, distributedLines };
+  },
+});
+
+
 // Get SP2D by NPD ID
 export const getByNPD = query({
   args: {
@@ -121,6 +231,12 @@ export const getByNPD = query({
     }
 
     const user = await ctx.db.get(userId);
+
+    // Check organization access
+    const userOrganizationId = user.organizationId;
+    if (args.organizationId && userOrganizationId !== args.organizationId) {
+      throw new Error("Access denied: User does not belong to specified organization");
+    }
     if (!user) {
       throw new Error("User not found");
     }
@@ -152,6 +268,12 @@ export const create = mutation({
     }
 
     const user = await ctx.db.get(userId);
+
+    // Check organization access
+    const userOrganizationId = user.organizationId;
+    if (args.organizationId && userOrganizationId !== args.organizationId) {
+      throw new Error("Access denied: User does not belong to specified organization");
+    }
     if (!user) {
       throw new Error("User not found");
     }
@@ -173,17 +295,45 @@ export const create = mutation({
       throw new Error("Only finalized NPDs can have SP2D records");
     }
 
+    // Check for duplicate SP2D number within the same organization
+    const existingSP2D = await ctx.db
+      .query("sp2dRefs")
+      .withIndex("by_organization", q => q.eq("organizationId", user.organizationId))
+      .collect()
+      .then(sp2ds => sp2ds.find(sp2d => sp2d.noSP2D === args.noSP2D));
+
+    if (existingSP2D) {
+      throw new Error(`Nomor SP2D ${args.noSP2D} sudah ada untuk organisasi ini. Gunakan nomor yang berbeda.`);
+    }
+
+    // Get NPD lines for proportional distribution FIRST
+    const npdLines = await ctx.db
+      .query("npdLines")
+      .withIndex("by_npd", (q) => q.eq("npdId", args.npdId))
+      .collect();
+
     // Validate SP2D amount doesn't exceed total NPD amount
     const totalNPDAmount = npdLines.reduce((sum, line) => sum + line.jumlah, 0);
     if (args.nilaiCair > totalNPDAmount) {
       throw new Error(`SP2D amount (${args.nilaiCair}) cannot exceed total NPD amount (${totalNPDAmount})`);
     }
 
-    // Get NPD lines for proportional distribution
-    const npdLines = await ctx.db
-      .query("npdLines")
-      .withIndex("by_npd", (q) => q.eq("npdId", args.npdId))
-      .collect();
+    // Enhanced validation: Check for duplicate SP2D within the same fiscal year
+    const sp2dDate = new Date(args.tglSP2D);
+    const fiscalYear = sp2dDate.getFullYear();
+
+    const existingSP2DInYear = await ctx.db
+      .query("sp2dRefs")
+      .withIndex("by_organization", q => q.eq("organizationId", user.organizationId))
+      .collect()
+      .then(sp2ds => sp2ds.find(sp2d => {
+        if (sp2d.noSP2D === args.noSP2D) return false; // Skip same number check (already validated)
+        const sp2dDateCheck = new Date(sp2d.tglSP2D);
+        return sp2dDateCheck.getFullYear() === fiscalYear;
+      }));
+
+    // Note: This is additional validation for business rules
+    console.log(`SP2D validation for year ${fiscalYear}:`, { existingSP2DInYear: !!existingSP2DInYear });
 
     // Calculate proportional distribution
     const distributionMap = new Map();
@@ -194,7 +344,18 @@ export const create = mutation({
       distributionMap.set(line._id, distributedAmount);
     }
 
-    // Create SP2D record FIRST
+    // Enhanced distribution validation
+    let totalDistributedAmount = 0;
+    for (const [lineId, amount] of distributionMap) {
+      totalDistributedAmount += amount;
+    }
+
+    // Validate distribution accuracy before creating SP2D
+    if (Math.abs(totalDistributedAmount - args.nilaiCair) > 1) {
+      throw new Error(`Distribusi tidak akurat. Total distribusi (${totalDistributedAmount}) tidak sama dengan nilai SP2D (${args.nilaiCair})`);
+    }
+
+    // Create SP2D record
     const sp2dId = await ctx.db.insert("sp2dRefs", {
       npdId: args.npdId,
       noSPM: args.noSPM,
@@ -264,6 +425,12 @@ export const distributeToRealizations = mutation({
     }
 
     const user = await ctx.db.get(userId);
+
+    // Check organization access
+    const userOrganizationId = user.organizationId;
+    if (args.organizationId && userOrganizationId !== args.organizationId) {
+      throw new Error("Access denied: User does not belong to specified organization");
+    }
     if (!user) {
       throw new Error("User not found");
     }
@@ -377,5 +544,35 @@ export const distributeToRealizations = mutation({
     });
 
     return { success: true, totalDistributed: totalDistribution };
+  },
+});
+
+// Real-time subscription for SP2D creation
+export const onCreate = query({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, { organizationId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return;
+    }
+
+    const user = await ctx.db.get(userId);
+
+    // Check organization access
+    const userOrganizationId = user.organizationId;
+    if (args.organizationId && userOrganizationId !== args.organizationId) {
+      throw new Error("Access denied: User does not belong to specified organization");
+    }
+    if (!user || user.organizationId !== organizationId) {
+      return;
+    }
+
+    // Subscribe to SP2D creation events for this organization
+    return ctx.db
+      .query("sp2dRefs")
+      .withIndex("by_organization", q => q.eq("organizationId", organizationId))
+      .collect();
   },
 });

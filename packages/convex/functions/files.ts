@@ -2,13 +2,21 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-// Upload a file and return the file URL
-export const uploadUrl = mutation({
+// Helper function to generate storage URLs
+function generateFileUrl(organizationId: string, npdId: string, filename: string): string {
+  const timestamp = Date.now();
+  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+  return `${organizationId}/${npdId}/${timestamp}-${sanitizedFilename}`;
+}
+
+// Upload a file using Convex storage and return the storage URL
+export const upload = mutation({
   args: {
     filename: v.string(),
     fileType: v.string(),
     fileSize: v.number(),
     npdId: v.id("npdDocuments"),
+    fileData: v.bytes(), // File data as bytes
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -27,8 +35,21 @@ export const uploadUrl = mutation({
       throw new Error("NPD not found or access denied");
     }
 
-    // Generate a unique file ID
-    const fileId = `files/${user.organizationId}/${args.npdId}/${Date.now()}-${args.filename}`;
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (args.fileSize > maxSize) {
+      throw new Error(`File size exceeds maximum limit of ${maxSize / 1024 / 1024}MB`);
+    }
+
+    // Generate unique file path
+    const fileUrl = generateFileUrl(
+      user.organizationId.toString(),
+      args.npdId.toString(),
+      args.filename
+    );
+
+    // Store file using Convex storage
+    const storageId = await ctx.storage.store(args.fileData);
 
     // Store file metadata in database
     const fileRecordId = await ctx.db.insert("npdFiles", {
@@ -36,19 +57,28 @@ export const uploadUrl = mutation({
       filename: args.filename,
       fileType: args.fileType,
       fileSize: args.fileSize,
-      fileUrl: fileId,
+      fileUrl: storageId, // Use Convex storage ID
+      status: "uploaded",
       uploadedBy: userId,
+      organizationId: user.organizationId,
+      uploadedAt: Date.now(),
+      createdAt: Date.now(),
+    });
+
+    // Create audit log
+    await ctx.db.insert("auditLogs", {
+      action: "file_uploaded",
+      entityTable: "npdFiles",
+      entityId: fileRecordId,
+      actorUserId: userId,
       organizationId: user.organizationId,
       createdAt: Date.now(),
     });
 
-    // Generate upload URL (in production, this would use a real storage service)
-    const uploadUrl = `${process.env.CONVEX_SITE_URL}/api/upload?fileId=${fileId}`;
-
     return {
       fileId: fileRecordId,
-      uploadUrl,
-      fileUrl: fileId,
+      storageId,
+      fileUrl: storageId,
     };
   },
 });
@@ -174,7 +204,7 @@ export const remove = mutation({
   },
 });
 
-// Get download URL for a file
+// Get download URL for a file using Convex storage
 export const getDownloadUrl = query({
   args: {
     fileId: v.id("npdFiles"),
@@ -195,9 +225,51 @@ export const getDownloadUrl = query({
       throw new Error("File not found or access denied");
     }
 
-    // Generate download URL (in production, this would use a real storage service)
-    const downloadUrl = `${process.env.CONVEX_SITE_URL}/api/download?fileId=${file.fileUrl}`;
+    // Generate download URL using Convex storage
+    const downloadUrl = await ctx.storage.getUrl(file.fileUrl);
 
-    return { downloadUrl, filename: file.filename, fileType: file.fileType };
+    return {
+      downloadUrl,
+      filename: file.filename,
+      fileType: file.fileType,
+      fileSize: file.fileSize
+    };
+  },
+});
+
+// Get file data directly from storage
+export const getFileData = query({
+  args: {
+    fileId: v.id("npdFiles"),
+  },
+  handler: async (ctx, { fileId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const file = await ctx.db.get(fileId);
+    if (!file || file.organizationId !== user.organizationId) {
+      throw new Error("File not found or access denied");
+    }
+
+    // Get file data from Convex storage
+    const fileData = await ctx.storage.get(file.fileUrl);
+
+    if (!fileData) {
+      throw new Error("File data not found in storage");
+    }
+
+    return {
+      data: fileData,
+      filename: file.filename,
+      fileType: file.fileType,
+      fileSize: file.fileSize,
+    };
   },
 });

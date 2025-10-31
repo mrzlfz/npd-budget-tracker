@@ -48,8 +48,7 @@ export function useFileUpload({
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  const uploadFile = useMutation(api.files.uploadUrl);
-  const confirmUpload = useMutation(api.files.confirmUpload);
+  const uploadFile = useMutation(api.files.upload);
 
   const validateFile = useCallback((file: File): string | null => {
     // Check file size
@@ -90,37 +89,19 @@ export function useFileUpload({
         f.id === file.id ? { ...f, status: 'uploading', progress: 0 } : f
       ));
 
-      // Get upload URL from Convex
+      // Convert file to bytes
+      const fileBytes = await file.arrayBuffer();
+
+      // Upload file directly to Convex storage
       const uploadResult = await uploadFile({
         filename: file.name,
         fileType: file.type,
         fileSize: file.size,
         npdId: npdId!,
+        fileData: new Uint8Array(fileBytes),
       });
 
-      // Simulate file upload (in production, this would be actual upload)
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise(resolve => setTimeout(resolve, 50));
-        setFiles(prev => prev.map(f =>
-          f.id === file.id ? { ...f, progress } : f
-        ));
-      }
 
-      // Upload file to the URL (simulation)
-      const response = await fetch(uploadResult.uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      // Confirm upload with Convex
-      await confirmUpload({ fileId: uploadResult.fileId });
 
       // Update status to success
       setFiles(prev => prev.map(f =>
@@ -155,7 +136,7 @@ export function useFileUpload({
 
       onError?.(errorMessage);
     }
-  }, [npdId, uploadFile, confirmUpload, onError]);
+  }, [npdId, uploadFile, onError]);
 
   const addFiles = useCallback((newFiles: File[]) => {
     const validFiles: FileWithPreview[] = [];

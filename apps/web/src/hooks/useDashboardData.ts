@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, useSubscription } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from 'convex/values';
 
@@ -24,6 +24,22 @@ export function useDashboardData(organizationId?: Id<"organizations">, fiscalYea
       organizationId,
       tahun: fiscalYear,
     } : "skip"
+  );
+
+  // Real-time subscriptions for automatic dashboard updates
+  useSubscription(
+    api.npd.onStatusChange,
+    organizationId ? { organizationId } : "skip"
+  );
+
+  useSubscription(
+    api.sp2d.onCreate,
+    organizationId ? { organizationId } : "skip"
+  );
+
+  useSubscription(
+    api.rkaAccounts.onRealizationUpdate,
+    organizationId ? { organizationId } : "skip"
   );
 
   // Get RKA accounts for budget data

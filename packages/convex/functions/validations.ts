@@ -74,7 +74,7 @@ export const validateNPD = mutation({
     const { organizationId, npdData } = args;
 
     // Get validation rules
-    const rules = await ctx.db.query(api.validations.getValidationRules, {
+    const rules = await ctx.runQuery(api.validations.getValidationRules, {
       organizationId
     });
 
@@ -146,7 +146,7 @@ export const validateSP2D = mutation({
     const { organizationId, sp2dData } = args;
 
     // Get validation rules
-    const rules = await ctx.db.query(api.validations.getValidationRules, {
+    const rules = await ctx.runQuery(api.validations.getValidationRules, {
       organizationId
     });
 
@@ -200,6 +200,283 @@ export const validateSP2D = mutation({
     };
   },
 });
+
+// PRD Section C2: File attachment validation per NPD type
+export interface NpdTypeValidation {
+  jenis: string;
+  nama: string;
+  requiredAttachments: string[];
+  optionalAttachments: string[];
+  maxFiles: number;
+  maxFileSizeMB: number;
+  allowedTypes: Record<string, string[]>;
+}
+
+// NPD type validation rules according to PRD
+const NPD_TYPE_VALIDATIONS: Record<string, NpdTypeValidation> = {
+  UP: {
+    jenis: "UP",
+    nama: "Uang Persediaan",
+    requiredAttachments: ["RAB"],
+    optionalAttachments: ["Kwitansi", "Faktur", "BAST"],
+    maxFiles: 5,
+    maxFileSizeMB: 10,
+    allowedTypes: {
+      "application/pdf": [".pdf"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+      "application/msword": [".doc"],
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+    },
+  },
+  GU: {
+    jenis: "GU",
+    nama: "Ganti Uang",
+    requiredAttachments: ["Kwitansi", "Surat Pengantar"],
+    optionalAttachments: ["Faktur", "BAST", "Dokumen Pendukung"],
+    maxFiles: 8,
+    maxFileSizeMB: 10,
+    allowedTypes: {
+      "application/pdf": [".pdf"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+      "application/msword": [".doc"],
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+    },
+  },
+  TU: {
+    jenis: "TU",
+    nama: "Tambahan Uang",
+    requiredAttachments: ["Surat Permohonan", "Dokumen Pendukung"],
+    optionalAttachments: ["RAB", "Kwitansi", "Faktur", "BAST"],
+    maxFiles: 6,
+    maxFileSizeMB: 10,
+    allowedTypes: {
+      "application/pdf": [".pdf"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+      "application/msword": [".doc"],
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+    },
+  },
+  LS: {
+    jenis: "LS",
+    nama: "Langsung",
+    requiredAttachments: ["Kontrak", "BAST", "Faktur"],
+    optionalAttachments: ["RAB", "Dokumen Pendukung", "Foto Kegiatan"],
+    maxFiles: 10,
+    maxFileSizeMB: 15, // Larger for contracts
+    allowedTypes: {
+      "application/pdf": [".pdf"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+      "application/msword": [".doc"],
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/png": [".png"],
+      "image/gif": [".gif"],
+    },
+  },
+};
+
+// Query to get validation rules for a specific NPD type
+export const getNpdTypeValidation = query({
+  args: {
+    jenis: v.string(), // "UP", "GU", "TU", "LS"
+  },
+  handler: async (ctx, { jenis }) => {
+    const validation = NPD_TYPE_VALIDATIONS[jenis.toUpperCase()];
+
+    if (!validation) {
+      throw new Error(`Unknown NPD type: ${jenis}`);
+    }
+
+    return validation;
+  },
+});
+
+// Query to validate attachments for an NPD
+export const validateNpdAttachments = query({
+  args: {
+    jenis: v.string(),
+    attachments: v.array(v.object({
+      jenis: v.string(), // Type of attachment
+      filename: v.string(),
+      fileSize: v.number(),
+      mimeType: v.string(),
+    })),
+  },
+  handler: async (ctx, { jenis, attachments }) => {
+    const validation = NPD_TYPE_VALIDATIONS[jenis.toUpperCase()];
+
+    if (!validation) {
+      throw new Error(`Unknown NPD type: ${jenis}`);
+    }
+
+    const result = {
+      isValid: true,
+      errors: [] as string[],
+      warnings: [] as string[],
+      missingRequired: [] as string[],
+      hasOptional: [] as string[],
+      validAttachments: [] as any[],
+      invalidAttachments: [] as any[],
+    };
+
+    // Check file count
+    if (attachments.length > validation.maxFiles) {
+      result.isValid = false;
+      result.errors.push(
+        `Maksimal ${validation.maxFiles} file, saat ini ${attachments.length} file`
+      );
+    }
+
+    // Check each attachment
+    for (const attachment of attachments) {
+      const attachmentErrors: string[] = [];
+
+      // Check file size
+      const fileSizeMB = attachment.fileSize / (1024 * 1024);
+      if (fileSizeMB > validation.maxFileSizeMB) {
+        attachmentErrors.push(
+          `File ${attachment.filename} terlalu besar. Maksimal ${validation.maxFileSizeMB}MB`
+        );
+      }
+
+      // Check file type
+      const isValidType = Object.entries(validation.allowedTypes).some(([mimeType, extensions]) =>
+        attachment.mimeType === mimeType ||
+        extensions.some((ext) =>
+          attachment.filename.toLowerCase().endsWith(ext)
+        )
+      );
+
+      if (!isValidType) {
+        const allowedTypes = Object.entries(validation.allowedTypes)
+          .map(([mimeType, extensions]) => extensions.join(", "))
+          .join(", ");
+        attachmentErrors.push(
+          `File ${attachment.filename} tidak valid. Tipe yang diperbolehkan: ${allowedTypes}`
+        );
+      }
+
+      if (attachmentErrors.length > 0) {
+        result.invalidAttachments.push({
+          ...attachment,
+          errors: attachmentErrors,
+        });
+      } else {
+        result.validAttachments.push(attachment);
+      }
+    }
+
+    // Check required attachments
+    const presentTypes = attachments.map(a => a.jenis);
+    for (const requiredType of validation.requiredAttachments) {
+      if (!presentTypes.includes(requiredType)) {
+        result.isValid = false;
+        result.missingRequired.push(requiredType);
+      }
+    }
+
+    // Check optional attachments
+    for (const optionalType of validation.optionalAttachments) {
+      if (presentTypes.includes(optionalType)) {
+        result.hasOptional.push(optionalType);
+      }
+    }
+
+    // Generate warning if no optional attachments
+    if (validation.optionalAttachments.length > 0 && result.hasOptional.length === 0) {
+      result.warnings.push(
+        `Tidak ada lampiran opsional. Pertimbangkan untuk melampirkan: ${validation.optionalAttachments.join(", ")}`
+      );
+    }
+
+    return result;
+  },
+});
+
+// Query to check if NPD can be submitted based on attachments
+export const canSubmitNpd = query({
+  args: {
+    jenis: v.string(),
+    attachments: v.array(v.object({
+      jenis: v.string(),
+      filename: v.string(),
+      fileSize: v.number(),
+      mimeType: v.string(),
+    })),
+  },
+  handler: async (ctx, { jenis, attachments }) => {
+    const validation = await validateNpdAttachments({ jenis, attachments });
+
+    return {
+      canSubmit: validation.isValid && validation.missingRequired.length === 0,
+      reason: validation.isValid && validation.missingRequired.length === 0
+        ? "NPD dapat diajukan"
+        : validation.errors.join("; ") ||
+          `Tidak dapat mengajukan NPD. Lampiran wajib yang hilang: ${validation.missingRequired.join(", ")}`,
+      validation,
+    };
+  },
+});
+
+// Helper function to get file category for display
+export function getFileCategory(filename: string, mimeType: string): string {
+  if (mimeType.startsWith("image/")) {
+    return "Gambar";
+  } else if (mimeType.includes("pdf")) {
+    return "PDF";
+  } else if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) {
+    return "Spreadsheet";
+  } else if (mimeType.includes("word") || mimeType.includes("document")) {
+    return "Dokumen";
+  } else {
+    return "File Lainnya";
+  }
+}
+
+// Helper function to validate single file
+export function validateSingleFile(
+  file: File,
+  validation: NpdTypeValidation
+): { isValid: boolean; error: string } {
+  // Check file size
+  const fileSizeMB = file.size / (1024 * 1024);
+  if (fileSizeMB > validation.maxFileSizeMB) {
+    return {
+      isValid: false,
+      error: `File ${file.name} terlalu besar. Maksimal ${validation.maxFileSizeMB}MB`,
+    };
+  }
+
+  // Check file type
+  const isValidType = Object.entries(validation.allowedTypes).some(([mimeType, extensions]) =>
+    file.type === mimeType ||
+    extensions.some((ext) =>
+      file.name.toLowerCase().endsWith(ext)
+    )
+  );
+
+  if (!isValidType) {
+    const allowedTypes = Object.entries(validation.allowedTypes)
+      .map(([mimeType, extensions]) => extensions.join(", "))
+      .join(", ");
+    return {
+      isValid: false,
+      error: `File ${file.name} tidak valid. Tipe yang diperbolehkan: ${allowedTypes}`,
+    };
+  }
+
+  return { isValid: true, error: "" };
+}
 
 // Helper function to format currency
 function formatCurrency(amount: number): string {
