@@ -32,7 +32,6 @@ import {
 import {
   IconTrendingUp,
   IconTrendingDown,
-  IconTrendingUp,
   IconCash,
   IconFileText,
   IconUsers,
@@ -41,7 +40,7 @@ import {
   IconX,
 } from '@tabler/icons-react'
 import { useAppSelector, useAppDispatch } from '@/lib/store'
-import { setRkaFiscalYear } from '@/lib/uiSlice'
+import { setRkaFiscalYear } from '@/lib/filtersSlice'
 import { BudgetUtilizationChart } from '@/components/charts/BudgetUtilizationChart'
 import { MultiIndicatorTrendChart } from '@/components/charts/MultiIndicatorTrendChart'
 import { formatCurrency, formatNumber } from '@/lib/utils/format'

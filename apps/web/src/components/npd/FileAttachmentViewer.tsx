@@ -34,7 +34,7 @@ import {
   IconAlertTriangle,
   IconX,
 } from "@tabler/icons-react";
-import { useConvexQuery } from "@/convex/ConvexClientProvider";
+import { useQuery as useConvexQuery } from "convex/react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { notifications } from "@mantine/notifications";

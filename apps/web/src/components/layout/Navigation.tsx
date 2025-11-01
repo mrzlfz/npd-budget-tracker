@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import {
   AppShell,
-  Navbar,
   Text,
   Group,
   ThemeIcon,
@@ -15,11 +14,13 @@ import {
   Collapse,
   Tooltip,
   Badge,
+  Stack,
 } from '@mantine/core'
+
+const Navbar = AppShell.Navbar
 import {
   IconHome,
   IconFileText,
-  IconDocument,
   IconChartBar,
   IconChartPie,
   IconSettings,
@@ -63,7 +64,7 @@ function NavItem({ item, active = false, onClick, level = 0 }: NavItemProps) {
     const icons: Record<string, any> = {
       Home: IconHome,
       FileText: IconFileText,
-      Document: IconDocument,
+      Document: IconFileText,
       BarChart: IconChartBar,
       ChartPie: IconChartPie,
       Settings: IconSettings,

@@ -1,470 +1,422 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import {
-  Container,
-  Title,
-  Tabs,
-  Card,
-  Stack,
-  Text,
-  Button,
-  SimpleGrid,
-  Group,
-  Badge,
-  LoadingOverlay,
-  Alert,
-  NumberInput,
-  TextInput,
-  Select,
-  ActionIcon,
-  Progress,
-  Table,
-} from '@mantine/core'
-import {
-  IconPlus,
-  IconBarChart,
-  IconFileText,
-  IconUpload,
-  IconEdit,
-  IconTrash,
-  IconEye,
-  IconCalendar,
-  IconTarget,
-  IconTrendingUp,
-} from '@tabler/icons-react'
+/**
+ * Performance Management Page
+ * 
+ * Displays performance logs with approval queue for Bendahara/Admin
+ * and performance history for all users.
+ */
+
+import { useState } from 'react'
 import { useQuery } from 'convex/react'
-import { api } from '../../../convex/_generated/api'
-import { usePermissions } from '@/hooks/usePermissions'
-import { formatCurrency, formatDate, formatNumber } from '@/lib/utils/format'
-import { notifications } from '@mantine/notifications'
+import { api } from '@/convex/_generated/api'
+import { useAuth } from '@/hooks/useAuth'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { CheckCircle, XCircle, Clock, TrendingUp, Search } from 'lucide-react'
+import { PerformanceApprovalModal } from '@/components/performance/PerformanceApprovalModal'
+import { formatCurrency, formatDate } from '@/lib/utils/format'
 
-interface PerformanceLog {
-  _id: string
-  subkegiatanId: string
-  indikatorNama: string
-  target: number
-  realisasi: number
-  satuan: string
-  periode: string
-  buktiURL?: string
-  buktiType?: string
-  buktiName?: string
-  keterangan?: string
-  approvalStatus: string
-  createdAt: number
-  createdBy: string
-}
-
-interface PerformanceSummary {
-  indikatorNama: string
-  totalTarget: number
-  totalRealisasi: number
-  avgTarget: number
-  avgRealisasi: number
-  persenCapaian: number
-  persenCapaianTerakhir: number
-  jumlahLogs: number
-}
-
-interface SubkegiatanWithLogs {
-  _id: string
-  kode: string
-  nama: string
-  uraian?: string
-  fiscalYear: number
-  performanceLogs: PerformanceLog[]
-  performanceSummary: PerformanceSummary[]
-}
-
-function ProgressRing({ percentage, color }: { percentage: number; color: string }) {
-  return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg className="w-12 h-12 transform -rotate-90">
-        <circle
-          cx="24"
-          cy="24"
-          r="20"
-          stroke="currentColor"
-          strokeWidth="4"
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={`${2 * Math.PI * 20}`}
-          strokeDashoffset={`${2 * Math.PI * 20} * (1 - percentage / 100)}`}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <Text size="sm" weight={600} c={color}>
-          {Math.round(percentage)}%
-        </Text>
-      </div>
-    </div>
-  )
-}
-
-function LogStatusBadge({ status }: { status: string }) {
-  const colors = {
-    draft: 'gray',
-    submitted: 'blue',
-    approved: 'green',
-  }
-
-  const labels = {
-    draft: 'Draft',
-    submitted: 'Diajukan',
-    approved: 'Disetujui',
-  }
-
-  return (
-    <Badge color={colors[status as keyof typeof colors] || 'gray'} variant="outline">
-      {labels[status as keyof typeof labels] || status}
-    </Badge>
-  )
-}
+type PerformanceLog = any // TODO: Add proper type from Convex
 
 export default function PerformancePage() {
-  const [selectedSubkegiatan, setSelectedSubkegiatan] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [periode, setPeriode] = useState('')
-  const [tahun, setTahun] = useState(new Date().getFullYear())
+  const { user, organizationId } = useAuth()
+  const [selectedTab, setSelectedTab] = useState<'pending' | 'approved' | 'rejected'>('pending')
+  const [selectedLog, setSelectedLog] = useState<PerformanceLog | null>(null)
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [periodFilter, setPeriodFilter] = useState<string>('all')
 
-  const { canCreatePerformance } = usePermissions()
+  // Query pending approvals
+  const pendingLogs = useQuery(
+    api.performance.getPendingApproval,
+    organizationId ? { organizationId, limit: 50 } : 'skip'
+  )
 
-  // Get subkegiatan data
-  const { data: subkegiatanList = [], isLoading: subkegiatanLoading } = useQuery({
-    queryKey: ['subkegiatanList', tahun],
-    queryFn: () => api.rkaAccounts.getSubkegiatans({
-      fiscalYear: tahun,
-    }),
-  })
+  // Query history (approved/rejected)
+  const historyLogs = useQuery(
+    api.performance.getHistory,
+    organizationId
+      ? {
+          organizationId,
+          status: selectedTab === 'approved' ? 'approved' : selectedTab === 'rejected' ? 'rejected' : undefined,
+          limit: 100,
+        }
+      : 'skip'
+  )
 
-  // Get performance data for selected subkegiatan
-  const { data: performanceData, isLoading: performanceLoading } = useQuery({
-    queryKey: ['performanceData', selectedSubkegiatan, periode],
-    queryFn: () => selectedSubkegiatan ?
-      api.performance.getBySubkegiatan({
-        subkegiatanId: selectedSubkegiatan,
-        periode: periode || undefined,
-        tahun: tahun || undefined,
-      }) : null,
-    enabled: !!selectedSubkegiatan,
-  })
+  const canApprove = user?.role === 'bendahara' || user?.role === 'admin'
 
-  // Generate fiscal years
-  const fiscalYears = Array.from({ length: 5 }, (_, i) => {
-    const year = new Date().getFullYear() - i
-    return { value: year, label: year.toString() }
-  })
+  // Filter logs based on search query and period
+  const filterLogs = (logs: PerformanceLog[] | undefined) => {
+    if (!logs) return []
+    
+    return logs.filter((log) => {
+      const matchesSearch =
+        searchQuery === '' ||
+        log.indikatorNama?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.subkegiatan?.nama?.toLowerCase().includes(searchQuery.toLowerCase())
+      
+      const matchesPeriod =
+        periodFilter === 'all' ||
+        log.periode?.toString().includes(periodFilter)
+      
+      return matchesSearch && matchesPeriod
+    })
+  }
 
-  const periodeOptions = [
-    { value: '', label: 'Semua Periode' },
-    { value: 'TW1', label: 'Triwulan I' },
-    { value: 'TW2', label: 'Triwulan II' },
-    { value: 'TW3', label: 'Triwulan III' },
-    { value: 'TW4', label: 'Triwulan IV' },
-    { value: 'Bulan 1', label: 'Januari' },
-    { value: 'Bulan 2', label: 'Februari' },
-    // ... bisa tambahkan bulan lainnya
-  ]
+  const filteredPending = filterLogs(pendingLogs)
+  const filteredHistory = filterLogs(historyLogs)
 
-  const handleCreateLog = () => {
-    if (!selectedSubkegiatan) {
-      notifications.show({
-        title: 'Info',
-        message: 'Pilih sub kegiatan terlebih dahulu',
-        color: 'yellow',
-      })
-      return
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Disetujui
+          </Badge>
+        )
+      case 'rejected':
+        return (
+          <Badge className="bg-red-100 text-red-800 hover:bg-red-200">
+            <XCircle className="w-3 h-3 mr-1" />
+            Ditolak
+          </Badge>
+        )
+      case 'pending':
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+            <Clock className="w-3 h-3 mr-1" />
+            Menunggu
+          </Badge>
+        )
+      default:
+        return <Badge variant="outline">{status}</Badge>
     }
-
-    // Navigate to create log page
-    window.location.href = `/performance/log/create?subkegiatanId=${selectedSubkegiatan}`
   }
 
-  const handleViewEvidence = (url?: string) => {
-    if (url) {
-      window.open(url, '_blank')
+  const getCapaianBadge = (percentage: number) => {
+    if (percentage >= 80) {
+      return <Badge className="bg-green-100 text-green-800">{percentage.toFixed(2)}%</Badge>
+    } else if (percentage >= 50) {
+      return <Badge className="bg-yellow-100 text-yellow-800">{percentage.toFixed(2)}%</Badge>
+    } else {
+      return <Badge className="bg-red-100 text-red-800">{percentage.toFixed(2)}%</Badge>
     }
   }
 
-  const handleEditLog = (logId: string) => {
-    window.location.href = `/performance/log/${logId}/edit`
-  }
-
-  if (subkegiatanLoading) {
-    return <LoadingOverlay visible />
+  const handleApprove = (log: PerformanceLog) => {
+    setSelectedLog(log)
+    setIsApprovalModalOpen(true)
   }
 
   return (
-    <Container size="xl" py="md">
+    <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
-      <Group justify="space-between" mb="lg">
+      <div className="flex items-center justify-between">
         <div>
-          <Title order={2}>Manajemen Kinerja</Title>
-          <Text color="dimmed" size="sm">
-            Monitoring dan evaluasi capaian kinerja sub kegiatan
-          </Text>
+          <h1 className="text-3xl font-bold tracking-tight">Manajemen Kinerja</h1>
+          <p className="text-muted-foreground mt-1">
+            Kelola dan setujui pencatatan kinerja sub kegiatan
+          </p>
         </div>
-        {canCreatePerformance && (
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={handleCreateLog}
-          >
-            Log Kinerja Baru
-          </Button>
+        {canApprove && pendingLogs && pendingLogs.length > 0 && (
+          <Badge variant="destructive" className="text-lg px-4 py-2">
+            {pendingLogs.length} Menunggu Persetujuan
+          </Badge>
         )}
-      </Group>
+      </div>
 
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-        {/* Left Column - Sub Kegiatan Selection */}
-        <Card p="md" withBorder>
-          <Title order={4} mb="md">Sub Kegiatan</Title>
-          <Stack gap="md">
-            <Select
-              label="Tahun Anggaran"
-              placeholder="Pilih tahun"
-              data={fiscalYears}
-              value={tahun}
-              onChange={(value) => setTahun(value || null)}
-              w="100%"
-            />
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Cari indikator atau sub kegiatan..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter Periode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Periode</SelectItem>
+                <SelectItem value="TW1">Triwulan 1</SelectItem>
+                <SelectItem value="TW2">Triwulan 2</SelectItem>
+                <SelectItem value="TW3">Triwulan 3</SelectItem>
+                <SelectItem value="TW4">Triwulan 4</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
-            <Select
-              label="Sub Kegiatan"
-              placeholder="Pilih sub kegiatan"
-              data={subkegiatanList.map(sk => ({
-                value: sk._id,
-                label: `${sk.kode} - ${sk.nama}`,
-              }))}
-              value={selectedSubkegiatan}
-              onChange={setSelectedSubkegiatan}
-              w="100%"
-              searchable
-            />
-
-            {selectedSubkegiatan && (
-              <Button
-                variant="outline"
-                fullWidth
-                onClick={() => setActiveTab('logs')}
-                leftSection={<IconBarChart size={16} />}
-              >
-                Lihat Kinerja
-              </Button>
+      {/* Tabs */}
+      <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as any)}>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="pending">
+            Menunggu Persetujuan
+            {pendingLogs && pendingLogs.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {pendingLogs.length}
+              </Badge>
             )}
-          </Stack>
-        </Card>
+          </TabsTrigger>
+          <TabsTrigger value="approved">Disetujui</TabsTrigger>
+          <TabsTrigger value="rejected">Ditolak</TabsTrigger>
+        </TabsList>
 
-        {/* Right Column - Performance Data */}
-        {selectedSubkegiatan && (
-          <Card p="md" withBorder>
-            <Group justify="space-between" mb="md">
-              <Title order={4}>Kinerja: {subkegiatanList.find(sk => sk._id === selectedSubkegiatan)?.nama}</Title>
-              <Select
-                placeholder="Pilih periode"
-                data={periodeOptions}
-                value={periode}
-                onChange={setPeriode}
-                w={200}
-                leftSection={<IconCalendar size={16} />}
-              />
-            </Group>
-
-            <Tabs value={activeTab} onChange={setActiveTab}>
-              <Tabs.List>
-                <Tabs.Tab value="dashboard">Dashboard</Tabs.Tab>
-                <Tabs.Tab value="logs">Log Details</Tabs.Tab>
-              </Tabs.List>
-
-              <Tabs.Panel value="dashboard">
-                {performanceLoading ? (
-                  <LoadingOverlay visible />
-                ) : performanceData ? (
-                  <Stack gap="md">
-                    {/* Performance Summary Cards */}
-                    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" mb="lg">
-                      {performanceData.performanceSummary.map((summary, index) => (
-                        <Card p="md" withBorder key={index}>
-                          <Group justify="space-between" mb="xs">
-                            <Text size="sm" weight={600}>{summary.indikatorNama}</Text>
-                            <Badge
-                              color={summary.persenCapaian >= 100 ? 'green' : summary.persenCapaian >= 80 ? 'yellow' : 'red'}
+        {/* Pending Approval Tab */}
+        <TabsContent value="pending">
+          <Card>
+            <CardHeader>
+              <CardTitle>Kinerja Menunggu Persetujuan</CardTitle>
+              <CardDescription>
+                {canApprove
+                  ? 'Tinjau dan setujui pencatatan kinerja dari PPTK'
+                  : 'Kinerja yang menunggu persetujuan dari Bendahara'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filteredPending.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">Tidak ada kinerja menunggu persetujuan</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {searchQuery || periodFilter !== 'all'
+                      ? 'Coba ubah filter pencarian'
+                      : 'Semua kinerja sudah diproses'}
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Sub Kegiatan</TableHead>
+                      <TableHead>Indikator</TableHead>
+                      <TableHead>Periode</TableHead>
+                      <TableHead className="text-right">Target</TableHead>
+                      <TableHead className="text-right">Realisasi</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead>Dibuat Oleh</TableHead>
+                      <TableHead>Tanggal</TableHead>
+                      {canApprove && <TableHead className="text-right">Aksi</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPending.map((log) => (
+                      <TableRow key={log._id}>
+                        <TableCell className="font-medium">
+                          {log.subkegiatan?.nama || '-'}
+                        </TableCell>
+                        <TableCell>{log.indikatorNama}</TableCell>
+                        <TableCell>{log.periode}</TableCell>
+                        <TableCell className="text-right">
+                          {log.target} {log.satuan}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {log.realisasi} {log.satuan}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {getStatusBadge(log.status)}
+                        </TableCell>
+                        <TableCell>{log.creator?.name || '-'}</TableCell>
+                        <TableCell>{formatDate(log.createdAt)}</TableCell>
+                        {canApprove && (
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => handleApprove(log)}
                             >
-                              {Math.round(summary.persenCapaian)}%
-                            </Badge>
-                          </Group>
-
-                          <Stack gap="xs">
-                            <Group justify="space-between">
-                              <Text size="xs" c="dimmed">Target vs Realisasi</Text>
-                              <Text size="sm" weight={600}>
-                                {formatNumber(summary.totalTarget)} / {formatNumber(summary.totalRealisasi)}
-                              </Text>
-                            </Group>
-
-                            <Progress
-                              value={summary.persenCapaian}
-                              color={summary.persenCapaian >= 100 ? 'green' : summary.persenCapaian >= 80 ? 'yellow' : 'red'}
-                              size="md"
-                            />
-                          </Stack>
-
-                          <Group justify="space-between">
-                            <Text size="xs" c="dimmed">Rata-rata</Text>
-                            <Text size="sm" weight={600}>
-                              {formatNumber(summary.avgTarget)} / {formatNumber(summary.avgRealisasi)}
-                            </Text>
-                          </Group>
-
-                          <Text size="xs" c="dimmed">
-                            {summary.jumlahLogs} log entries
-                          </Text>
-
-                          {summary.persenCapaianTerakhir !== undefined && (
-                            <Text size="xs" color="dimmed" mt="sm">
-                              Trend: {summary.persenCapaianTerakhir > 50 ? '📈' : '📉'} ({Math.round(summary.persenCapaianTerakhir - summary.persenCapaian)}%)
-                            </Text>
-                          )}
-                        </Card>
-                      ))}
-                    </SimpleGrid>
-
-                    {/* Visual Charts */}
-                    <Card p="md" withBorder>
-                      <Title order={5} mb="md">Visualisasi Capaian</Title>
-                      <Text size="sm" color="dimmed" mb="lg">
-                        Grafik pencapaian kinerja berdasarkan indikator yang tersedia
-                      </Text>
-
-                      {/* Placeholder for charts - akan diimplementasikan dengan Recharts */}
-                      <Stack align="center" gap="md">
-                        <Text size="lg" color="dimmed">
-                          📊 Chart Component akan diimplementasikan
-                        </Text>
-                        <Text size="sm" color="dimmed">
-                          Menggunakan data kinerja untuk visualisasi real-time
-                        </Text>
-                      </Stack>
-                    </Card>
-                  </Stack>
-                ) : (
-                  <Alert color="blue" title="Data Tidak Tersedia">
-                    Pilih sub kegiatan untuk melihat data kinerja.
-                  </Alert>
-                )}
-              </Tabs.Panel>
-
-              <Tabs.Panel value="logs">
-                {performanceLoading ? (
-                  <LoadingOverlay visible />
-                ) : performanceData && performanceData.performanceLogs.length > 0 ? (
-                  <Card p="md" withBorder>
-                    <Title order={5} mb="md">Log Kinerja Detail</Title>
-
-                    <Table striped highlightOnHover>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Indikator</Table.Th>
-                          <Table.Th>Target</Table.Th>
-                          <Table.Th>Realisasi</Table.Th>
-                          <Table.Th>% Capaian</Table.Th>
-                          <Table.Th>Periode</Table.Th>
-                          <Table.Th>Status</Table.Th>
-                          <Table.Th>Bukti</Table.Th>
-                          <Table.Th>Aksi</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {performanceData.performanceLogs.map((log) => (
-                          <Table.Tr key={log._id}>
-                            <Table.Td>
-                              <Text size="sm" weight={600}>{log.indikatorNama}</Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="sm">{formatNumber(log.target)} {log.satuan}</Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="sm" weight={600}>{formatNumber(log.realisasi)} {log.satuan}</Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="sm" weight={600}>
-                                {Math.round((log.realisasi / log.target) * 100)}%
-                              </Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="sm">{log.periode}</Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <LogStatusBadge status={log.approvalStatus} />
-                            </Table.Td>
-                            <Table.Td>
-                              {log.buktiURL && (
-                                <ActionIcon
-                                  variant="light"
-                                  color="blue"
-                                  size="sm"
-                                  onClick={() => handleViewEvidence(log.buktiURL)}
-                                  title="Lihat Bukti"
-                                >
-                                  <IconEye size={14} />
-                                </ActionIcon>
-                              )}
-                            </Table.Td>
-                            <Table.Td>
-                              <Group gap="xs">
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="yellow"
-                                  size="sm"
-                                  onClick={() => handleEditLog(log._id)}
-                                  title="Edit"
-                                >
-                                  <IconEdit size={14} />
-                                </ActionIcon>
-                                {/* Delete button bisa ditambahkan */}
-                              </Group>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  </Card>
-                ) : (
-                  <Alert color="yellow" title="Belum Ada Log">
-                    Belum ada log kinerja untuk sub kegiatan yang dipilih.
-                    Buat log kinerja pertama dengan klik tombol "Log Kinerja Baru".
-                  </Alert>
-                )}
-              </Tabs.Panel>
-            </Tabs>
+                              Tinjau
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
           </Card>
-        )}
+        </TabsContent>
 
-        {/* State ketika belum ada sub kegiatan yang dipilih */}
-        {!selectedSubkegiatan && (
-          <Card p="md" withBorder>
-            <Stack align="center" gap="md">
-              <IconFileText size={64} color="gray" />
-              <Text size="lg" color="dimmed" ta="center">
-                Pilih Sub Kegiatan
-              </Text>
-              <Text size="sm" color="dimmed" ta="center">
-                untuk memulai monitoring kinerja
-              </Text>
-            </Stack>
+        {/* Approved Tab */}
+        <TabsContent value="approved">
+          <Card>
+            <CardHeader>
+              <CardTitle>Kinerja Disetujui</CardTitle>
+              <CardDescription>
+                Riwayat kinerja yang telah disetujui
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filteredHistory.length === 0 ? (
+                <div className="text-center py-12">
+                  <TrendingUp className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">Belum ada kinerja disetujui</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {searchQuery || periodFilter !== 'all'
+                      ? 'Coba ubah filter pencarian'
+                      : 'Kinerja yang disetujui akan muncul di sini'}
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Sub Kegiatan</TableHead>
+                      <TableHead>Indikator</TableHead>
+                      <TableHead>Periode</TableHead>
+                      <TableHead className="text-right">Target</TableHead>
+                      <TableHead className="text-right">Realisasi</TableHead>
+                      <TableHead className="text-center">Capaian</TableHead>
+                      <TableHead>Disetujui Oleh</TableHead>
+                      <TableHead>Tanggal Disetujui</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredHistory.map((log) => {
+                      const capaian = log.persentaseCapaian || 0
+                      return (
+                        <TableRow key={log._id}>
+                          <TableCell className="font-medium">
+                            {log.subkegiatan?.nama || '-'}
+                          </TableCell>
+                          <TableCell>{log.indikatorNama}</TableCell>
+                          <TableCell>{log.periode}</TableCell>
+                          <TableCell className="text-right">
+                            {log.target} {log.satuan}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {log.realisasi} {log.satuan}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {getCapaianBadge(capaian)}
+                          </TableCell>
+                          <TableCell>{log.approver?.name || '-'}</TableCell>
+                          <TableCell>{formatDate(log.approvedAt)}</TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
           </Card>
-        )}
-      </SimpleGrid>
+        </TabsContent>
 
-      {/* Development Notice */}
-      {process.env.NODE_ENV === 'development' && (
-        <Alert color="blue" title="Mode Pengembangan" mt="lg">
-          <Text size="sm">
-            Halaman performance monitoring menggunakan data dari Convex development environment.
-            Dalam produksi, semua data akan real-time synchronization.
-          </Text>
-        </Alert>
+        {/* Rejected Tab */}
+        <TabsContent value="rejected">
+          <Card>
+            <CardHeader>
+              <CardTitle>Kinerja Ditolak</CardTitle>
+              <CardDescription>
+                Riwayat kinerja yang ditolak dengan alasan penolakan
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filteredHistory.length === 0 ? (
+                <div className="text-center py-12">
+                  <XCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">Belum ada kinerja ditolak</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {searchQuery || periodFilter !== 'all'
+                      ? 'Coba ubah filter pencarian'
+                      : 'Kinerja yang ditolak akan muncul di sini'}
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Sub Kegiatan</TableHead>
+                      <TableHead>Indikator</TableHead>
+                      <TableHead>Periode</TableHead>
+                      <TableHead className="text-right">Target</TableHead>
+                      <TableHead className="text-right">Realisasi</TableHead>
+                      <TableHead>Alasan Penolakan</TableHead>
+                      <TableHead>Ditolak Oleh</TableHead>
+                      <TableHead>Tanggal Ditolak</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredHistory.map((log) => (
+                      <TableRow key={log._id}>
+                        <TableCell className="font-medium">
+                          {log.subkegiatan?.nama || '-'}
+                        </TableCell>
+                        <TableCell>{log.indikatorNama}</TableCell>
+                        <TableCell>{log.periode}</TableCell>
+                        <TableCell className="text-right">
+                          {log.target} {log.satuan}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {log.realisasi} {log.satuan}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                          {log.rejectionReason || '-'}
+                        </TableCell>
+                        <TableCell>{log.rejector?.name || '-'}</TableCell>
+                        <TableCell>{formatDate(log.rejectedAt)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Approval Modal */}
+      {selectedLog && (
+        <PerformanceApprovalModal
+          isOpen={isApprovalModalOpen}
+          onClose={() => {
+            setIsApprovalModalOpen(false)
+            setSelectedLog(null)
+          }}
+          performanceLog={selectedLog}
+        />
       )}
-    </Container>
+    </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 interface PaginationProps {
   currentPage: number;
@@ -61,7 +61,7 @@ export function Pagination({ currentPage, totalItems, itemsPerPage, onPageChange
               className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
             >
               <span className="sr-only">Previous</span>
-              <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
+              <IconChevronLeft className="h-5 w-5" aria-hidden="true" />
             </button>
             
             {/* First page */}
@@ -119,7 +119,7 @@ export function Pagination({ currentPage, totalItems, itemsPerPage, onPageChange
               className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
             >
               <span className="sr-only">Next</span>
-              <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+              <IconChevronRight className="h-5 w-5" aria-hidden="true" />
             </button>
           </nav>
         </div>

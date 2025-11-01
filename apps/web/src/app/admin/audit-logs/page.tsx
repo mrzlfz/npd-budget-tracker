@@ -36,7 +36,7 @@ import { usePagination } from "@mantine/hooks";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { api } from "@/convex/_generated/api";
-import { useConvexQuery } from "@/convex/ConvexClientProvider";
+import { useQuery as useConvexQuery } from "convex/react";
 import { AuditLogDetails } from "@/components/admin/audit-logs/AuditLogDetails";
 
 interface AuditLogFilters {
@@ -62,7 +62,9 @@ export default function AuditLogsPage() {
   const [selectedLog, setSelectedLog] = useState<any>(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  const pagination = usePagination(1, 20);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+  const pagination = usePagination({ total: 100, page: currentPage, onChange: setCurrentPage });
 
   // Get current organization (you may need to adjust this based on your auth context)
   const { data: organization } = useQuery({
@@ -74,71 +76,24 @@ export default function AuditLogsPage() {
     },
   });
 
+  // TODO: Implement audit logs API functions in Convex
   // Get available actions for filter dropdown
-  const { data: availableActions } = useConvexQuery(
-    api.auditLogs.getAvailableActions,
-    organization?.id ? { organizationId: organization.id as any } : "skip"
-  );
+  const availableActions: string[] = []; // Mock data until API is implemented
 
   // Get available entity tables for filter dropdown
-  const { data: availableEntityTables } = useConvexQuery(
-    api.auditLogs.getAvailableEntityTables,
-    organization?.id ? { organizationId: organization.id as any } : "skip"
-  );
+  const availableEntityTables: string[] = []; // Mock data until API is implemented
 
   // Get audit log statistics
-  const { data: stats, isLoading: statsLoading } = useConvexQuery(
-    api.auditLogs.getAuditLogStats,
-    organization?.id && !showFilters
-      ? {
-          organizationId: organization.id as any,
-          dateFrom: filters.dateFrom ? filters.dateFrom.getTime() : undefined,
-          dateTo: filters.dateTo ? filters.dateTo.getTime() : undefined,
-        }
-      : "skip"
-  );
+  const stats = null;
+  const statsLoading = false;
 
   // Get audit logs
-  const { data: logsData, isLoading: logsLoading } = useConvexQuery(
-    api.auditLogs.getAuditLogs,
-    organization?.id
-      ? {
-          organizationId: organization.id as any,
-          filters: {
-            action: filters.action,
-            entityTable: filters.entityTable,
-            actorUserId: filters.actorUserId ? (filters.actorUserId as any) : undefined,
-            dateFrom: filters.dateFrom ? filters.dateFrom.getTime() : undefined,
-            dateTo: filters.dateTo ? filters.dateTo.getTime() : undefined,
-            search: filters.search,
-          },
-          paginationOpts: {
-            cursor: null,
-            numItems: pagination.limit,
-            cursorField: "_creationTime",
-            cursorDirection: "backwards",
-          },
-        }
-      : "skip"
-  );
+  const logsData: any[] = []; // Mock empty array
+  const logsLoading = false;
 
   // Export audit logs
-  const { data: exportData, refetch: exportLogs } = useConvexQuery(
-    api.auditLogs.exportAuditLogs,
-    organization?.id && showDetails
-      ? {
-          organizationId: organization.id as any,
-          filters: {
-            action: filters.action,
-            entityTable: filters.entityTable,
-            actorUserId: filters.actorUserId ? (filters.actorUserId as any) : undefined,
-            dateFrom: filters.dateFrom ? filters.dateFrom.getTime() : undefined,
-            dateTo: filters.dateTo ? filters.dateTo.getTime() : undefined,
-          },
-          format: "csv",
-        }
-      : "skip"
-  );
+  const exportData = null;
+  const exportLogs = () => {}; // Mock function
 
   const handleExport = async () => {
     try {
@@ -162,12 +117,12 @@ export default function AuditLogsPage() {
 
   const resetFilters = () => {
     setFilters({});
-    pagination.setPage(1);
+    setCurrentPage(1);
   };
 
   const applyFilters = (newFilters: AuditLogFilters) => {
     setFilters(newFilters);
-    pagination.setPage(1);
+    setCurrentPage(1);
   };
 
   const viewLogDetails = (log: any) => {
@@ -328,7 +283,7 @@ export default function AuditLogsPage() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {logsData?.page?.map((log: any) => (
+                  {logsData && Array.isArray(logsData) && logsData.map((log: any) => (
                     <Table.Tr key={log._id}>
                       <Table.Td>
                         <Text size="sm">
@@ -381,7 +336,7 @@ export default function AuditLogsPage() {
                 </Table.Tbody>
               </Table>
 
-              {(!logsData?.page || logsData.page.length === 0) && !logsLoading && (
+              {(!logsData || (Array.isArray(logsData) && logsData.length === 0)) && !logsLoading && (
                 <Box py="xl" ta="center">
                   <Text color="dimmed">No audit logs found</Text>
                 </Box>
@@ -390,16 +345,16 @@ export default function AuditLogsPage() {
           </Box>
 
           {/* Pagination */}
-          {logsData && logsData.page.length > 0 && (
+          {logsData && Array.isArray(logsData) && logsData.length > 0 && (
             <Box pt="md">
               <Group justify="center">
                 <Pagination
                   total={Math.ceil(
-                    (logsData.isDone ? logsData.page.length : 1000) /
-                      pagination.limit
+                    (Array.isArray(logsData) ? logsData.length : 0) /
+                      itemsPerPage
                   )}
-                  page={pagination.active}
-                  onChange={pagination.setPage}
+                  page={currentPage}
+                  onChange={setCurrentPage}
                 />
               </Group>
             </Box>

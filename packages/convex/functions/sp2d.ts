@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalAction } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 // Helper function to format currency
 function formatCurrency(amount: number): string {
@@ -408,6 +409,13 @@ export const create = mutation({
       createdAt: Date.now(),
     });
 
+    // Send email notification to finance team and NPD creator asynchronously
+    await ctx.scheduler.runAfter(0, internal.sp2d.sendSP2DCreatedEmail, {
+      sp2dId,
+      createdBy: userId,
+      npdId: args.npdId,
+    });
+
     return sp2dId;
   },
 });
@@ -574,5 +582,531 @@ export const onCreate = query({
       .query("sp2dRefs")
       .withIndex("by_organization", q => q.eq("organizationId", organizationId))
       .collect();
+  },
+});
+// ========================================
+// SP2D Edit/Update Functionality
+// ========================================
+
+/**
+ * Update SP2D with realization recalculation
+ * This will:
+ * 1. Revert old realization amounts
+ * 2. Recalculate distribution with new amounts
+ * 3. Update realizations and rkaAccounts
+ */
+export const update = mutation({
+  args: {
+    sp2dId: v.id("sp2dRefs"),
+    noSPM: v.optional(v.string()),
+    noSP2D: v.string(),
+    tglSP2D: v.number(),
+    nilaiCair: v.number(),
+    catatan: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Check if user has permission to update SP2D (bendahara/admin only)
+    const canUpdate = await hasPermission(ctx, userId, 'update', 'sp2d');
+    if (!canUpdate) {
+      throw new Error("You don't have permission to update SP2D records");
+    }
+
+    // Get existing SP2D
+    const existingSP2D = await ctx.db.get(args.sp2dId);
+    if (!existingSP2D) {
+      throw new Error("SP2D not found");
+    }
+
+    // Check organization access
+    if (existingSP2D.organizationId !== user.organizationId) {
+      throw new Error("Access denied");
+    }
+
+    // Get NPD to validate
+    const npd = await ctx.db.get(existingSP2D.npdId);
+    if (!npd || npd.organizationId !== user.organizationId) {
+      throw new Error("NPD not found or access denied");
+    }
+
+    // Check if NPD is still finalized
+    if (npd.status !== "final") {
+      throw new Error("Can only update SP2D for finalized NPDs");
+    }
+
+    // Check for duplicate SP2D number (excluding current SP2D)
+    if (args.noSP2D !== existingSP2D.noSP2D) {
+      const duplicateSP2D = await ctx.db
+        .query("sp2dRefs")
+        .withIndex("by_organization", q => q.eq("organizationId", user.organizationId))
+        .collect()
+        .then(sp2ds => sp2ds.find(sp2d => sp2d.noSP2D === args.noSP2D && sp2d._id !== args.sp2dId));
+
+      if (duplicateSP2D) {
+        throw new Error(`Nomor SP2D ${args.noSP2D} sudah ada. Gunakan nomor yang berbeda.`);
+      }
+    }
+
+    // Get NPD lines for validation
+    const npdLines = await ctx.db
+      .query("npdLines")
+      .withIndex("by_npd", (q) => q.eq("npdId", existingSP2D.npdId))
+      .collect();
+
+    const totalNPDAmount = npdLines.reduce((sum, line) => sum + line.jumlah, 0);
+
+    // Validate new SP2D amount doesn't exceed total NPD amount
+    if (args.nilaiCair > totalNPDAmount) {
+      throw new Error(`SP2D amount (${args.nilaiCair}) cannot exceed total NPD amount (${totalNPDAmount})`);
+    }
+
+    // STEP 1: Revert old realization amounts
+    const oldRealizations = await ctx.db
+      .query("realizations")
+      .withIndex("by_sp2d", (q) => q.eq("sp2dId", args.sp2dId))
+      .collect();
+
+    for (const realization of oldRealizations) {
+      // Get the account
+      const account = await ctx.db.get(realization.accountId);
+      if (!account) continue;
+
+      // Revert sisaPagu (add back the old realization)
+      const newSisaPagu = account.sisaPagu + realization.jumlah;
+
+      // Revert realisasiTahun (subtract the old realization)
+      const newRealisasiTahun = account.realisasiTahun - realization.jumlah;
+
+      // Update account
+      await ctx.db.patch(realization.accountId, {
+        sisaPagu: newSisaPagu,
+        realisasiTahun: newRealisasiTahun,
+        updatedAt: Date.now(),
+      });
+
+      // Delete old realization record
+      await ctx.db.delete(realization._id);
+    }
+
+    // STEP 2: Calculate new proportional distribution
+    const newDistributionMap = new Map();
+
+    for (const line of npdLines) {
+      const proportion = line.jumlah / totalNPDAmount;
+      const distributedAmount = Math.round(args.nilaiCair * proportion * 100) / 100;
+      newDistributionMap.set(line._id, distributedAmount);
+    }
+
+    // Validate new distribution sum
+    let totalNewDistributed = 0;
+    for (const amount of newDistributionMap.values()) {
+      totalNewDistributed += amount;
+    }
+
+    // Handle rounding differences
+    const roundingDiff = args.nilaiCair - totalNewDistributed;
+    if (Math.abs(roundingDiff) > 0.01) {
+      // Adjust the largest line item to compensate for rounding
+      let largestLineId = null;
+      let largestAmount = 0;
+      for (const [lineId, amount] of newDistributionMap) {
+        if (amount > largestAmount) {
+          largestAmount = amount;
+          largestLineId = lineId;
+        }
+      }
+      if (largestLineId) {
+        newDistributionMap.set(largestLineId, largestAmount + roundingDiff);
+      }
+    }
+
+    // STEP 3: Update SP2D record
+    await ctx.db.patch(args.sp2dId, {
+      noSPM: args.noSPM,
+      noSP2D: args.noSP2D,
+      tglSP2D: args.tglSP2D,
+      nilaiCair: args.nilaiCair,
+      catatan: args.catatan,
+      updatedAt: Date.now(),
+    });
+
+    // STEP 4: Create new realization records and update accounts
+    for (const line of npdLines) {
+      const amount = newDistributionMap.get(line._id) || 0;
+      if (amount === 0) continue;
+
+      // Get the account
+      const account = await ctx.db.get(line.accountId);
+      if (!account) {
+        throw new Error(`Account not found for line ${line._id}`);
+      }
+
+      // Check if new amount would exceed pagu
+      const newRealisasiTahun = account.realisasiTahun + amount;
+      if (newRealisasiTahun > account.pagu) {
+        throw new Error(
+          `Realization amount ${formatCurrency(amount)} for account ${account.kode} would exceed pagu ${formatCurrency(account.pagu)}`
+        );
+      }
+
+      // Create new realization record
+      await ctx.db.insert("realizations", {
+        sp2dId: args.sp2dId,
+        npdId: existingSP2D.npdId,
+        accountId: line.accountId,
+        jumlah: amount,
+        periode: new Date(args.tglSP2D).toISOString().slice(0, 7), // YYYY-MM format
+        keterangan: `SP2D ${args.noSP2D} (Updated)`,
+        organizationId: user.organizationId,
+        createdBy: userId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      // Update account with new realization
+      const newSisaPagu = account.sisaPagu - amount;
+      await ctx.db.patch(line.accountId, {
+        sisaPagu: newSisaPagu,
+        realisasiTahun: newRealisasiTahun,
+        updatedAt: Date.now(),
+      });
+
+      // Create audit log for account update
+      await ctx.db.insert("auditLogs", {
+        action: "realization_updated",
+        entityTable: "rkaAccounts",
+        entityId: line.accountId,
+        actorUserId: userId,
+        organizationId: user.organizationId,
+        keterangan: `SP2D ${args.noSP2D} updated: ${formatCurrency(amount)} to account ${account.kode}`,
+        createdAt: Date.now(),
+      });
+    }
+
+    // Create audit log for SP2D update
+    await ctx.db.insert("auditLogs", {
+      action: "updated",
+      entityTable: "sp2dRefs",
+      entityId: args.sp2dId,
+      actorUserId: userId,
+      organizationId: user.organizationId,
+      entityData: {
+        oldAmount: existingSP2D.nilaiCair,
+        newAmount: args.nilaiCair,
+        oldNoSP2D: existingSP2D.noSP2D,
+        newNoSP2D: args.noSP2D,
+      },
+      keterangan: `Updated SP2D from ${formatCurrency(existingSP2D.nilaiCair)} to ${formatCurrency(args.nilaiCair)}`,
+      createdAt: Date.now(),
+    });
+
+    return { success: true, sp2dId: args.sp2dId };
+  },
+});
+
+// ========================================
+// SP2D Soft Delete Functionality
+// ========================================
+
+/**
+ * Soft delete SP2D with realization reversion
+ * This will:
+ * 1. Mark SP2D as deleted
+ * 2. Revert all realization amounts
+ * 3. Restore sisaPagu to rkaAccounts
+ */
+export const softDelete = mutation({
+  args: {
+    sp2dId: v.id("sp2dRefs"),
+    reason: v.string(), // Required reason for deletion
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Check if user has permission to delete SP2D (admin only for safety)
+    if (user.role !== 'admin' && user.role !== 'bendahara') {
+      throw new Error("Only Admin or Bendahara can delete SP2D records");
+    }
+
+    // Get existing SP2D
+    const sp2d = await ctx.db.get(args.sp2dId);
+    if (!sp2d) {
+      throw new Error("SP2D not found");
+    }
+
+    // Check organization access
+    if (sp2d.organizationId !== user.organizationId) {
+      throw new Error("Access denied");
+    }
+
+    // Check if already deleted
+    if (sp2d.deletedAt) {
+      throw new Error("SP2D is already deleted");
+    }
+
+    // Get all realizations for this SP2D
+    const realizations = await ctx.db
+      .query("realizations")
+      .withIndex("by_sp2d", (q) => q.eq("sp2dId", args.sp2dId))
+      .collect();
+
+    // Revert all realizations
+    for (const realization of realizations) {
+      // Get the account
+      const account = await ctx.db.get(realization.accountId);
+      if (!account) {
+        console.warn(`Account not found for realization ${realization._id}`);
+        continue;
+      }
+
+      // Restore sisaPagu (add back the realization amount)
+      const newSisaPagu = account.sisaPagu + realization.jumlah;
+
+      // Reduce realisasiTahun (subtract the realization amount)
+      const newRealisasiTahun = Math.max(0, account.realisasiTahun - realization.jumlah);
+
+      // Update account
+      await ctx.db.patch(realization.accountId, {
+        sisaPagu: newSisaPagu,
+        realisasiTahun: newRealisasiTahun,
+        updatedAt: Date.now(),
+      });
+
+      // Create audit log for realization reversion
+      await ctx.db.insert("auditLogs", {
+        action: "realization_reverted",
+        entityTable: "rkaAccounts",
+        entityId: realization.accountId,
+        actorUserId: userId,
+        organizationId: user.organizationId,
+        keterangan: `SP2D ${sp2d.noSP2D} deleted: reverted ${formatCurrency(realization.jumlah)} from account ${account.kode}`,
+        createdAt: Date.now(),
+      });
+
+      // Delete realization record
+      await ctx.db.delete(realization._id);
+    }
+
+    // Mark SP2D as deleted (soft delete)
+    await ctx.db.patch(args.sp2dId, {
+      deletedAt: Date.now(),
+      deletedBy: userId,
+      catatan: `${sp2d.catatan || ''}\n\nDELETED: ${args.reason}`,
+      updatedAt: Date.now(),
+    });
+
+    // Create audit log for SP2D deletion
+    await ctx.db.insert("auditLogs", {
+      action: "deleted",
+      entityTable: "sp2dRefs",
+      entityId: args.sp2dId,
+      actorUserId: userId,
+      organizationId: user.organizationId,
+      entityData: {
+        noSP2D: sp2d.noSP2D,
+        nilaiCair: sp2d.nilaiCair,
+        reason: args.reason,
+        realizationsReverted: realizations.length,
+      },
+      keterangan: `Deleted SP2D ${sp2d.noSP2D} (${formatCurrency(sp2d.nilaiCair)}): ${args.reason}`,
+      createdAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      realizationsReverted: realizations.length,
+      amountReverted: sp2d.nilaiCair,
+    };
+  },
+});
+
+/**
+ * Restore soft-deleted SP2D (Admin only)
+ */
+export const restore = mutation({
+  args: {
+    sp2dId: v.id("sp2dRefs"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Only admin can restore
+    if (user.role !== 'admin') {
+      throw new Error("Only Admin can restore deleted SP2D records");
+    }
+
+    // Get SP2D
+    const sp2d = await ctx.db.get(args.sp2dId);
+    if (!sp2d) {
+      throw new Error("SP2D not found");
+    }
+
+    // Check organization access
+    if (sp2d.organizationId !== user.organizationId) {
+      throw new Error("Access denied");
+    }
+
+    // Check if deleted
+    if (!sp2d.deletedAt) {
+      throw new Error("SP2D is not deleted");
+    }
+
+    // Get NPD to validate
+    const npd = await ctx.db.get(sp2d.npdId);
+    if (!npd || npd.status !== "final") {
+      throw new Error("Cannot restore SP2D: NPD is not finalized");
+    }
+
+    // Get NPD lines for recalculation
+    const npdLines = await ctx.db
+      .query("npdLines")
+      .withIndex("by_npd", (q) => q.eq("npdId", sp2d.npdId))
+      .collect();
+
+    const totalNPDAmount = npdLines.reduce((sum, line) => sum + line.jumlah, 0);
+
+    // Recalculate distribution
+    const distributionMap = new Map();
+    for (const line of npdLines) {
+      const proportion = line.jumlah / totalNPDAmount;
+      const distributedAmount = Math.round(sp2d.nilaiCair * proportion * 100) / 100;
+      distributionMap.set(line._id, distributedAmount);
+    }
+
+    // Recreate realizations and update accounts
+    for (const line of npdLines) {
+      const amount = distributionMap.get(line._id) || 0;
+      if (amount === 0) continue;
+
+      // Get the account
+      const account = await ctx.db.get(line.accountId);
+      if (!account) continue;
+
+      // Check if amount would exceed pagu
+      const newRealisasiTahun = account.realisasiTahun + amount;
+      if (newRealisasiTahun > account.pagu) {
+        throw new Error(
+          `Cannot restore: Realization amount ${formatCurrency(amount)} for account ${account.kode} would exceed pagu ${formatCurrency(account.pagu)}`
+        );
+      }
+
+      // Create realization record
+      await ctx.db.insert("realizations", {
+        sp2dId: args.sp2dId,
+        npdId: sp2d.npdId,
+        accountId: line.accountId,
+        jumlah: amount,
+        periode: new Date(sp2d.tglSP2D).toISOString().slice(0, 7),
+        keterangan: `SP2D ${sp2d.noSP2D} (Restored)`,
+        organizationId: user.organizationId,
+        createdBy: userId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      // Update account
+      const newSisaPagu = account.sisaPagu - amount;
+      await ctx.db.patch(line.accountId, {
+        sisaPagu: newSisaPagu,
+        realisasiTahun: newRealisasiTahun,
+        updatedAt: Date.now(),
+      });
+    }
+
+    // Remove deletion markers
+    await ctx.db.patch(args.sp2dId, {
+      deletedAt: undefined,
+      deletedBy: undefined,
+      updatedAt: Date.now(),
+    });
+
+    // Create audit log
+    await ctx.db.insert("auditLogs", {
+      action: "restored",
+      entityTable: "sp2dRefs",
+      entityId: args.sp2dId,
+      actorUserId: userId,
+      organizationId: user.organizationId,
+      keterangan: `Restored SP2D ${sp2d.noSP2D}`,
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Get deleted SP2D records (for admin review)
+ */
+export const getDeleted = query({
+  args: {
+    organizationId: v.id("organizations"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user || user.organizationId !== args.organizationId) {
+      throw new Error("Access denied");
+    }
+
+    // Only admin can view deleted records
+    if (user.role !== 'admin') {
+      throw new Error("Only Admin can view deleted SP2D records");
+    }
+
+    const deletedSP2Ds = await ctx.db
+      .query("sp2dRefs")
+      .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) => q.neq(q.field("deletedAt"), undefined))
+      .order("desc")
+      .take(args.limit || 50);
+
+    // Enrich with NPD and user details
+    const enriched = await Promise.all(
+      deletedSP2Ds.map(async (sp2d) => {
+        const npd = await ctx.db.get(sp2d.npdId);
+        const deletedByUser = sp2d.deletedBy ? await ctx.db.get(sp2d.deletedBy) : null;
+        const createdByUser = await ctx.db.get(sp2d.createdBy);
+
+        return {
+          ...sp2d,
+          npd: npd ? { id: npd._id, nomorNPD: npd.nomorNPD } : null,
+          deletedByUser: deletedByUser ? { id: deletedByUser._id, name: deletedByUser.name } : null,
+          createdByUser: createdByUser ? { id: createdByUser._id, name: createdByUser.name } : null,
+        };
+      })
+    );
+
+    return enriched;
   },
 });

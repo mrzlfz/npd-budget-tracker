@@ -16,7 +16,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { IconDownload, IconCalendar, IconFileSpreadsheet } from '@tabler/icons-react';
 import { format, parseISO } from 'date-fns';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface ExportFilter {
   startDate: string;
@@ -100,26 +100,46 @@ export default function ExcelExportButton() {
         );
       });
 
-      // Prepare Excel data
-      const headers = filters.includeHeaders ? exportColumns.map(col => col.label) : [];
-      const excelData = filteredData.map(item => ({
-        'Nomor NPD': item.documentNumber,
-        'Judul': item.title,
-        'Jenis': item.jenis,
-        'Status': item.status,
-        'Dibuat Oleh': item.createdBy,
-        'Tanggal': format(new Date(item.createdAt), 'dd/MM/yyyy'),
-        'Total': item.totalAmount,
-        'OPD': item.organizationName,
-      }));
+      // Create workbook using ExcelJS
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'NPD Tracker';
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet('NPD Data');
 
-      // Create workbook
-      const ws = XLSX.utils.json_to_sheet(excelData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'NPD Data');
+      // Add header row
+      if (filters.includeHeaders) {
+        const headerRow = worksheet.addRow(exportColumns.map(col => col.label));
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF4472C4' }
+        };
+        headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+
+      // Add data rows
+      filteredData.forEach(item => {
+        worksheet.addRow([
+          item.documentNumber,
+          item.title,
+          item.jenis,
+          item.status,
+          item.createdBy,
+          format(new Date(item.createdAt), 'dd/MM/yyyy'),
+          item.totalAmount,
+          item.organizationName,
+        ]);
+      });
+
+      // Set column widths
+      exportColumns.forEach((col, idx) => {
+        worksheet.getColumn(idx + 1).width = col.width / 7; // Convert pixels to Excel width units
+      });
 
       // Generate Excel file
-      const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      const excelBuffer = await workbook.xlsx.writeBuffer();
 
       // Create download
       const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -130,6 +150,7 @@ export default function ExcelExportButton() {
       link.href = url;
       link.download = `npd-export-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
       document.body.appendChild(link);
+      link.click();
 
       notifications.show({
         title: 'Export Berhasil',

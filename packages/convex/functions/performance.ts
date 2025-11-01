@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalAction } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 // Permission checking helper (reuse from npd.ts)
 async function hasPermission(ctx: any, userId: any, action: string, resource: string): Promise<boolean> {

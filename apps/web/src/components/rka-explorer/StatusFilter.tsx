@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FunnelIcon } from '@heroicons/react/24/outline';
+import { IconFilter } from '@tabler/icons-react';
 
 interface StatusFilterProps {
   value: string;
@@ -28,7 +28,7 @@ export function StatusFilter({ value, onChange }: StatusFilterProps) {
         className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:focus:ring-indigo-400"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <FunnelIcon className="h-4 w-4" aria-hidden="true" />
+        <IconFilter className="h-4 w-4" aria-hidden="true" />
         {selectedOption?.label || 'Status'}
       </button>
 

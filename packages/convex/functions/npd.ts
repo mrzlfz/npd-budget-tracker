@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalAction } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 // NPD Status State Machine
 const NPD_STATUS_TRANSITIONS = {
@@ -481,6 +482,12 @@ export const submit = mutation({
       createdAt: Date.now(),
     });
 
+    // Send email notification to verifiers asynchronously
+    await ctx.scheduler.runAfter(0, internal.npd.sendNPDSubmittedEmail, {
+      npdId: args.npdId,
+      submittedBy: userId,
+    });
+
     return updated;
   },
 });
@@ -538,6 +545,12 @@ export const verify = mutation({
       createdAt: Date.now(),
     });
 
+    // Send email notification to NPD creator asynchronously
+    await ctx.scheduler.runAfter(0, internal.npd.sendNPDVerifiedEmail, {
+      npdId: args.npdId,
+      verifiedBy: userId,
+    });
+
     return updated;
   },
 });
@@ -592,6 +605,12 @@ export const finalize = mutation({
       actorUserId: userId,
       organizationId: user.organizationId,
       createdAt: Date.now(),
+    });
+
+    // Send email notification to stakeholders asynchronously
+    await ctx.scheduler.runAfter(0, internal.npd.sendNPDFinalizedEmail, {
+      npdId: args.npdId,
+      finalizedBy: userId,
     });
 
     return updated;
@@ -1244,6 +1263,13 @@ export const reject = mutation({
       organizationId: user.organizationId,
       keterangan: args.catatanPenolakan,
       createdAt: Date.now(),
+    });
+
+    // Send email notification to NPD creator asynchronously
+    await ctx.scheduler.runAfter(0, internal.npd.sendNPDRejectedEmail, {
+      npdId: args.npdId,
+      rejectedBy: userId,
+      reason: args.catatanPenolakan,
     });
 
     return updated;

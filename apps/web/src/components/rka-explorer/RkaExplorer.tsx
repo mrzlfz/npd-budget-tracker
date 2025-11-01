@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from 'convex/react';
-import { api } from '../../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import { SearchInput } from './SearchInput';
 import { StatusFilter } from './StatusFilter';
 import { FiscalYearFilter } from './FiscalYearFilter';

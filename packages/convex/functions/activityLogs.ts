@@ -2,7 +2,7 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-// Get all activity logs for the organization
+// Get all audit logs for the organization (consolidated from activityLogs)
 export const list = query({
   args: {
     limit: v.optional(v.number()),
@@ -20,26 +20,26 @@ export const list = query({
       throw new Error("User not found");
     }
 
-    // Get all activity logs for the organization
-    let activityLogs = await ctx.db
-      .query("activityLogs")
+    // Get all audit logs for the organization
+    let auditLogs = await ctx.db
+      .query("auditLogs")
       .withIndex("by_organization", (q) => q.eq("organizationId", user.organizationId))
       .order("desc")
       .collect();
 
     // Apply pagination if specified
     if (args.offset && args.offset > 0) {
-      activityLogs = activityLogs.slice(args.offset);
+      auditLogs = auditLogs.slice(args.offset);
     }
 
     if (args.limit && args.limit > 0) {
-      activityLogs = activityLogs.slice(0, args.limit);
+      auditLogs = auditLogs.slice(0, args.limit);
     }
 
-    // Get user information for each activity log
-    const activityLogsWithUsers = await Promise.all(
-      activityLogs.map(async (log) => {
-        const logUser = await ctx.db.get(log.userId);
+    // Get user information for each audit log
+    const auditLogsWithUsers = await Promise.all(
+      auditLogs.map(async (log) => {
+        const logUser = await ctx.db.get(log.actorUserId);
         return {
           ...log,
           user: logUser ? {
@@ -51,15 +51,15 @@ export const list = query({
       })
     );
 
-    return activityLogsWithUsers;
+    return auditLogsWithUsers;
   },
 });
 
-// Get activity logs for a specific entity
+// Get audit logs for a specific entity
 export const getByEntity = query({
   args: {
-    entityType: v.string(),
-    entityId: v.union(v.id("rkaDocuments"), v.id("npdDocuments"), v.id("budgetItems")),
+    entityTable: v.string(), // Changed from entityType to entityTable to match auditLogs schema
+    entityId: v.string(), // Now a string to match audit logs schema
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -73,24 +73,24 @@ export const getByEntity = query({
       throw new Error("User not found");
     }
 
-    // Get all activity logs for the entity
-    const activityLogs = await ctx.db
-      .query("activityLogs")
+    // Get all audit logs for the entity
+    const auditLogs = await ctx.db
+      .query("auditLogs")
       .withIndex("by_entity", (q) => 
-        q.eq("entityType", args.entityType).eq("entityId", args.entityId)
+        q.eq("entityTable", args.entityTable).eq("entityId", args.entityId)
       )
       .order("desc")
       .collect();
 
     // Filter by organization
-    const organizationLogs = activityLogs.filter(
+    const organizationLogs = auditLogs.filter(
       log => log.organizationId === user.organizationId
     );
 
-    // Get user information for each activity log
-    const activityLogsWithUsers = await Promise.all(
+    // Get user information for each audit log
+    const auditLogsWithUsers = await Promise.all(
       organizationLogs.map(async (log) => {
-        const logUser = await ctx.db.get(log.userId);
+        const logUser = await ctx.db.get(log.actorUserId);
         return {
           ...log,
           user: logUser ? {
@@ -102,11 +102,11 @@ export const getByEntity = query({
       })
     );
 
-    return activityLogsWithUsers;
+    return auditLogsWithUsers;
   },
 });
 
-// Get activity logs for a specific user
+// Get audit logs for a specific user
 export const getByUser = query({
   args: {
     userId: v.id("users"),
@@ -136,27 +136,27 @@ export const getByUser = query({
       throw new Error("Access denied");
     }
 
-    // Get all activity logs for the user
-    let activityLogs = await ctx.db
-      .query("activityLogs")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+    // Get all audit logs for the user (using actorUserId)
+    let auditLogs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_actor", (q) => q.eq("actorUserId", args.userId))
       .order("desc")
       .collect();
 
     // Apply pagination if specified
     if (args.offset && args.offset > 0) {
-      activityLogs = activityLogs.slice(args.offset);
+      auditLogs = auditLogs.slice(args.offset);
     }
 
     if (args.limit && args.limit > 0) {
-      activityLogs = activityLogs.slice(0, args.limit);
+      auditLogs = auditLogs.slice(0, args.limit);
     }
 
-    return activityLogs;
+    return auditLogs;
   },
 });
 
-// Get activity logs by action type
+// Get audit logs by action type
 export const getByAction = query({
   args: {
     action: v.string(),
@@ -175,29 +175,29 @@ export const getByAction = query({
       throw new Error("User not found");
     }
 
-    // Get all activity logs for the organization
-    let activityLogs = await ctx.db
-      .query("activityLogs")
+    // Get all audit logs for the organization
+    let auditLogs = await ctx.db
+      .query("auditLogs")
       .withIndex("by_organization", (q) => q.eq("organizationId", user.organizationId))
       .order("desc")
       .collect();
 
     // Filter by action type
-    const actionLogs = activityLogs.filter(log => log.action === args.action);
+    let actionLogs = auditLogs.filter(log => log.action === args.action);
 
     // Apply pagination if specified
     if (args.offset && args.offset > 0) {
-      actionLogs.slice(args.offset);
+      actionLogs = actionLogs.slice(args.offset);
     }
 
     if (args.limit && args.limit > 0) {
-      actionLogs.slice(0, args.limit);
+      actionLogs = actionLogs.slice(0, args.limit);
     }
 
-    // Get user information for each activity log
-    const activityLogsWithUsers = await Promise.all(
+    // Get user information for each audit log
+    const auditLogsWithUsers = await Promise.all(
       actionLogs.map(async (log) => {
-        const logUser = await ctx.db.get(log.userId);
+        const logUser = await ctx.db.get(log.actorUserId);
         return {
           ...log,
           user: logUser ? {
@@ -209,11 +209,11 @@ export const getByAction = query({
       })
     );
 
-    return activityLogsWithUsers;
+    return auditLogsWithUsers;
   },
 });
 
-// Get activity logs by date range
+// Get audit logs by date range
 export const getByDateRange = query({
   args: {
     startDate: v.number(),
@@ -233,31 +233,31 @@ export const getByDateRange = query({
       throw new Error("User not found");
     }
 
-    // Get all activity logs for the organization
-    let activityLogs = await ctx.db
-      .query("activityLogs")
+    // Get all audit logs for the organization
+    let auditLogs = await ctx.db
+      .query("auditLogs")
       .withIndex("by_organization", (q) => q.eq("organizationId", user.organizationId))
       .order("desc")
       .collect();
 
     // Filter by date range
-    const dateRangeLogs = activityLogs.filter(
+    let dateRangeLogs = auditLogs.filter(
       log => log.createdAt >= args.startDate && log.createdAt <= args.endDate
     );
 
     // Apply pagination if specified
     if (args.offset && args.offset > 0) {
-      dateRangeLogs.slice(args.offset);
+      dateRangeLogs = dateRangeLogs.slice(args.offset);
     }
 
     if (args.limit && args.limit > 0) {
-      dateRangeLogs.slice(0, args.limit);
+      dateRangeLogs = dateRangeLogs.slice(0, args.limit);
     }
 
-    // Get user information for each activity log
-    const activityLogsWithUsers = await Promise.all(
+    // Get user information for each audit log
+    const auditLogsWithUsers = await Promise.all(
       dateRangeLogs.map(async (log) => {
-        const logUser = await ctx.db.get(log.userId);
+        const logUser = await ctx.db.get(log.actorUserId);
         return {
           ...log,
           user: logUser ? {
@@ -269,6 +269,6 @@ export const getByDateRange = query({
       })
     );
 
-    return activityLogsWithUsers;
+    return auditLogsWithUsers;
   },
 });

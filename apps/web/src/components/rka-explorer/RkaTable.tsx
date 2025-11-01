@@ -1,6 +1,6 @@
 'use client';
 
-import { DocumentTextIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { IconFileText, IconEye, IconPencil } from '@tabler/icons-react';
 import { RkaDocument } from '@/types/rka';
 
 interface RkaDocumentWithId extends RkaDocument {
@@ -35,7 +35,7 @@ export function RkaTable({ documents, isLoading }: RkaTableProps) {
       <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
         <div className="bg-white px-4 py-5 sm:p-6 dark:bg-gray-800">
           <div className="text-center">
-            <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <IconFileText className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
               No RKA documents found
             </h3>
@@ -139,14 +139,14 @@ export function RkaTable({ documents, isLoading }: RkaTableProps) {
                     className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                     title="View"
                   >
-                    <EyeIcon className="h-5 w-5" aria-hidden="true" />
+                    <IconEye className="h-5 w-5" aria-hidden="true" />
                   </button>
                   <button
                     type="button"
                     className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                     title="Edit"
                   >
-                    <PencilIcon className="h-5 w-5" aria-hidden="true" />
+                    <IconPencil className="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
               </td>

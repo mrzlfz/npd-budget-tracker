@@ -23,7 +23,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Legend,
   ComposedChart,
@@ -279,6 +279,7 @@ export function MultiIndicatorTrendChart({
             return `${value} ${unit}`
           }}
         />
+        <RechartsTooltip content={<CustomTooltip />} />
         {selectedIndicators.includes(indicator.id) && (
           <>
             <Line
@@ -332,6 +333,7 @@ export function MultiIndicatorTrendChart({
               return `${value} ${unit}`
             }}
           />
+          <RechartsTooltip content={<CustomTooltip />} />
           {selectedIndicators.map((indicatorId, index) => {
             const indicator = indicators.find(ind => ind.id === indicatorId)
             if (!indicator) return null
@@ -340,24 +342,26 @@ export function MultiIndicatorTrendChart({
             const color = colors[index % colors.length]
 
             return (
-              <Area
-                key={`${indicatorId}_realisasi`}
-                type="monotone"
-                dataKey={indicatorId}
-                stackId={indicatorId}
-                stroke={color}
-                fill={color}
-                fillOpacity={0.3}
-                strokeWidth={2}
-              />
-              <Line
-                key={`${indicatorId}_target`}
-                type="monotone"
-                dataKey={`${indicatorId}_target`}
-                stroke={color}
-                strokeDasharray="5 5"
-                strokeWidth={2}
-              />
+              <>
+                <Area
+                  key={`${indicatorId}_realisasi`}
+                  type="monotone"
+                  dataKey={indicatorId}
+                  stackId={indicatorId}
+                  stroke={color}
+                  fill={color}
+                  fillOpacity={0.3}
+                  strokeWidth={2}
+                />
+                <Line
+                  key={`${indicatorId}_target`}
+                  type="monotone"
+                  dataKey={`${indicatorId}_target`}
+                  stroke={color}
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                />
+              </>
             )
           })}
         </ComposedChart>
@@ -431,7 +435,7 @@ export function MultiIndicatorTrendChart({
         </div>
 
         <div>
-          <Text size="sm" weight={600" mb="md">Mode</Text>
+          <Text size="sm" weight={600} mb="md">Mode</Text>
           <Button.Group>
             <Button
               variant={compareMode === 'single' ? 'filled' : 'light'}
@@ -451,7 +455,7 @@ export function MultiIndicatorTrendChart({
         </div>
 
         <div>
-          <Text size="sm" weight={600" mb="md">Time Range</Text>
+          <Text size="sm" weight={600} mb="md">Time Range</Text>
           <Select
             size="sm"
             value={timeRange}
@@ -461,7 +465,7 @@ export function MultiIndicatorTrendChart({
         </div>
 
         <div>
-          <Text size="sm" weight={600" mb="md">Period</Text>
+          <Text size="sm" weight={600} mb="md">Period</Text>
           <Select
             size="sm"
             value={periodFilter}

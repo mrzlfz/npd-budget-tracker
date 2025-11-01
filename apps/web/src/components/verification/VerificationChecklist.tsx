@@ -21,7 +21,7 @@ import {
   IconCheck,
   IconX,
   IconAlertTriangle,
-  IconSave,
+  IconDeviceFloppy,
   IconEye,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
@@ -329,7 +329,7 @@ export function VerificationChecklist({
               <Button
                 variant="outline"
                 color="blue"
-                leftSection={<IconSave size={16} />}
+                leftSection={<IconDeviceFloppy size={16} />}
                 onClick={() => handleSave('in_progress')}
                 loading={isLoading}
                 disabled={isSaveDisabled()}

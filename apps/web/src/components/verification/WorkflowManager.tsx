@@ -193,7 +193,7 @@ export function WorkflowManager({ npdId, onClose }: WorkflowManagerProps) {
   };
 
   return (
-    <Card p="md" withBorder h="600px">
+    <Card p="md" withBorder style={{ height: '600px' }}>
       <Stack gap="lg">
         {/* Header */}
         <Group justify="space-between" mb="md">
@@ -236,7 +236,6 @@ export function WorkflowManager({ npdId, onClose }: WorkflowManagerProps) {
               </Text>
             </Group>
           </Group>
-          </Group>
 
           <Timeline
             bulletSize={24}
@@ -270,7 +269,6 @@ export function WorkflowManager({ npdId, onClose }: WorkflowManagerProps) {
             >
               Lihat Detail
             </Button>
-          </Group>
           </Group>
 
           <Stack gap="sm">

@@ -31,7 +31,7 @@ import {
 } from '@tabler/icons-react';
 import { z } from 'zod';
 import { useQuery } from 'convex/react';
-import { api } from '../../../../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 import { env } from '@/env';
 import { formatCurrency } from '@/lib/utils/format';
 import { useFileUpload } from '@/hooks/useFileUpload';

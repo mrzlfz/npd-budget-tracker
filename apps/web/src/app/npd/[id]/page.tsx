@@ -34,7 +34,7 @@ import {
   IconCurrency,
 } from '@tabler/icons-react'
 import { useQuery } from 'convex/react'
-import { api } from '../../../../convex/_generated/api'
+import { api } from '@/convex/_generated/api'
 import { usePermissions } from '@/hooks/usePermissions'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format'
 import { notifications } from '@mantine/notifications'

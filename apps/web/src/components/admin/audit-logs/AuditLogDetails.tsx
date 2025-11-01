@@ -26,7 +26,7 @@ import {
 } from "@tabler/icons-react";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
-import { useConvexQuery } from "@/convex/ConvexClientProvider";
+import { useQuery as useConvexQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 interface AuditLogDetailsProps {

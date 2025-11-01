@@ -26,12 +26,12 @@ import {
   IconFileText,
   IconCalendar,
   IconCalculator,
-  IconDistribute,
+  IconShare,
   IconEdit,
 } from '@tabler/icons-react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from 'convex/react'
-import { api } from '../../../../convex/_generated/api'
+import { api } from '@/convex/_generated/api'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format'
 import { notifications } from '@mantine/notifications'
 
@@ -328,7 +328,7 @@ export default function SP2DDetailPage() {
               <Title order={4}>Distribusi Realisasi</Title>
               <Button
                 variant="filled"
-                leftSection={<IconDistribute size={16} />}
+                leftSection={<IconShare size={16} />}
                 onClick={handleDistribute}
                 disabled={!npdDetail.lines || npdDetail.lines.length === 0}
               >

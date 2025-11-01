@@ -21,14 +21,13 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Cell,
   PieChart,
   Pie,
   Area,
   AreaChart,
-  Area,
 } from 'recharts'
 import {
   IconDownload,
@@ -215,7 +214,7 @@ export function BudgetUtilizationChart({
           tick={{ fontSize: 11 }}
           tickFormatter={(value) => `Rp${(value / 1000000).toFixed(1)}jt`}
         />
-        <Tooltip content={<CustomTooltip label="Detail Budget" />} />
+        <RechartsTooltip content={<CustomTooltip label="Detail Budget" />} />
         <Bar
           dataKey="pagu"
           fill="#e3f2fd"
@@ -281,7 +280,7 @@ export function BudgetUtilizationChart({
               />
             ))}
           </Pie>
-          <Tooltip content={<CustomTooltip label="Proyeksi" />} />
+          <RechartsTooltip content={<CustomTooltip label="Proyeksi" />} />
         </PieChart>
       </ResponsiveContainer>
     )
@@ -311,7 +310,7 @@ export function BudgetUtilizationChart({
           tick={{ fontSize: 11 }}
           tickFormatter={(value) => `Rp${(value / 1000000).toFixed(1)}jt`}
         />
-        <Tooltip content={<CustomTooltip label="Tren" />} />
+        <RechartsTooltip content={<CustomTooltip label="Tren" />} />
         <Area
           type="monotone"
           dataKey="pagu"
